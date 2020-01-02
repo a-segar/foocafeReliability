@@ -1,0 +1,100 @@
+---
+title: "Uber"
+author: "Andrew Segar"
+date: '2020-01-02'
+output: html_document
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+#library(foocafeReliability)
+library(rstan)
+library(ggplot2)
+```
+
+## Generate data
+```{R}
+
+n = 500
+a = 2
+b = 4
+c = 8
+
+data <- data.frame(x = numeric(n),
+                   y = numeric(n),
+                   y_obs = numeric(n),
+                   observed = character(n))
+
+data["x"] <- rnorm(n, 0, 0.34)
+
+link <- log(1+exp(a*data$x+b))
+
+data["y"] <- rexp(n, rate = 1 / link)
+
+data["observed"] <- data$y < c
+
+data["y_obs"] <- data["y"]
+data[data$observed == FALSE,"y_obs"] <- c
+
+ggplot(data = data) +
+  geom_point(aes(x = x, y = y, colour = "Actual"), colour = "blue") +
+  geom_point(aes(x = x, y = y_obs, colour = "Observed"), colour = "turquoise") +
+  geom_smooth(aes(x = x, y = y), method = lm, se = FALSE, colour = "blue") +
+  geom_smooth(data = subset(data, observed == TRUE), aes(x = x, y = y), method = lm, se = FALSE, colour = "turquoise")
+
+```
+
+
+
+
+## Build model
+```{R}
+
+modelString <- "
+  data {
+    int <lower=0> Nobs;
+    vector[Nobs] x;
+  }
+
+  parameters {
+    real a;
+    real b;
+  }
+  
+  transformed parameters {
+    real link;
+    
+    link = log(a*x + b);
+  }
+
+  model {
+    target += exp_pdf(1 / link);
+
+    a ~ normal(0, 10);
+    b ~ normal(0, 10);
+  }
+"
+
+uber_model <- rstan::stan_model(model_code = modelString)
+
+
+```
+
+## Fit model to data
+```{R}
+
+
+```
+
+## Evaluate goodness of fit
+```{R}
+
+
+
+```

@@ -1,0 +1,31 @@
+Package: foocafeReliability
+Title: Bayesian Reliability Tools and Examples
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Noah",
+           family = "Schellenberg",
+           role = c("aut", "cre"),
+           email = "noah.schellenberg@tetrapak.com")
+    person(given = "Andrew",
+           family = "Segar",
+           role = c("aut", "cre"),
+           email = "sesegaran@tetrapak.com")
+Description: Tools and examples for use with the Bayesian reliability session at Foocafe in Malmö.
+  Examples are taken from the book 'Bayesian Reliability' by Hamada, Wilson, Reese et al.
+  Another example comes from the article 'Modelling Cesored Time-to-Event Data Using Pyro, an
+  Open Source Probabilistic Programming Language'.
+  (https://eng.uber.com/modeling-censored-time-to-event-data-using-pyro/)
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 6.1.1
+Depends: R (>= 3.6.0)
+Imports: 
+    dplyr,
+    shiny
+Suggests: 
+    testthat,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
