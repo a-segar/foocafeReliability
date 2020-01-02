@@ -1,0 +1,165 @@
+---
+title: "lcd_projector_failures"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{lcd_projector_failures}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(foocafeReliability)
+library(rstan)
+```
+
+
+## Build model
+```{R}
+
+modelString <- "
+  data {
+    int <lower=0> Nobs;
+    real <lower=0> projection_hours[Nobs];
+  }
+
+  parameters {
+    real <lower=0> lambda;
+    
+    real <lower=0> lambda_prior;
+  }
+  
+  transformed parameters {
+    real MTTF;
+    
+    MTTF = 1 / lambda;
+  }
+
+  model {
+    projection_hours ~ exponential(lambda);
+
+    lambda ~ gamma(2.5, 2350);
+    lambda_prior ~ gamma(2.5,2350);
+  }
+"
+
+lcd_projector_failures_model <- rstan::stan_model(model_code = modelString)
+
+
+```
+
+## Fit model to data
+```{R}
+
+lcd_fail_list <- list(Nobs = NROW(lcd_projector_failures$projection_hours),
+                          projection_hours = lcd_projector_failures$projection_hours
+                          )
+
+output <- rstan::sampling(lcd_projector_failures_model, data = lcd_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+
+```{R}
+
+stan_hist(output, c("lambda", "lambda_prior", "MTTF"))
+
+```
+
+
+```{R}
+
+output_vals <- extract(output)
+
+data <- data.frame(output_vals["lambda"],
+                   output_vals["lambda_prior"],
+                   output_vals["MTTF"])
+
+ggplot(data = data) +
+  geom_density(aes(lambda)) +
+  geom_density(aes(lambda_prior), linetype = "dashed")
+
+ggplot(data = data) +
+  geom_density(aes(MTTF))
+
+
+```
+
+
+```{R}
+
+t = seq(1,3500,100)
+lambda_vals <- output_vals[["lambda"]]
+
+reliability <- data.frame(matrix(0,
+                          nrow = NROW(t),
+                          ncol = NROW(lambda_vals)))
+
+for (ii in 1:NROW(reliability)) {
+  print(ii)
+  reliability[ii,] = exp(-lambda_vals * t[ii])
+}
+
+ggplot(data = reliability) +
+  geom_density(aes(lambda)) +
+  geom_density(aes(lambda_prior), linetype = "dashed")
+
+
+```
+
+
+```{R}
+
+costTableList <- list()
+
+for (ii in 1:NROW(output_vals$lambda)){
+
+  thisLambda <- output_vals$lambda[ii]
+  
+  get_reliability <- function(thisLambda){
+    f1 <- function(t){
+      exp(-thisLambda * t)
+    }
+    return(f1)
+  }
+
+  reliability <- get_reliability(thisLambda)
+
+  costTable <- data.frame("t" = t,
+                          "reliability" = numeric(NROW(t)))
+
+  costTable$reliability <- reliability(t)
+  
+  costTableList[[ii]] <- costTable
+}
+
+temp <- lapply(costTableList, '[', 2) %>% dplyr::bind_cols()
+
+data <- data.frame(t = t,
+                   meanVal = apply(temp, 1, mean),
+                   LQ = apply(temp, 1, function(x) {quantile(x, 0.01)}),
+                   UQ = apply(temp, 1, function(x) {quantile(x, 0.99)}))
+
+
+ggplot(data = data, aes(t)) +
+  geom_line(aes(y = meanVal)) +
+  geom_ribbon(aes(ymin = LQ, ymax = UQ), alpha = 0.05)
+  
+
+```
+
+
+
+
+## Evaluate goodness of fit
+```{R}
+
+
+
+```
