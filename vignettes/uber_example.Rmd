@@ -21,7 +21,7 @@ library(ggplot2)
 ## Generate data
 ```{R}
 
-n = 500
+n = 5000
 a = 2
 b = 4
 c = 8
@@ -35,7 +35,7 @@ data["x"] <- rnorm(n, 0, 0.34)
 
 link <- log(1+exp(a*data$x+b))
 
-data["y"] <- rexp(n, rate = 1 / link)
+data["y"] <- rexp(n, rate = 1/link)
 
 data["observed"] <- data$y < c
 
@@ -45,56 +45,75 @@ data[data$observed == FALSE,"y_obs"] <- c
 ggplot(data = data) +
   geom_point(aes(x = x, y = y, colour = "Actual"), colour = "blue") +
   geom_point(aes(x = x, y = y_obs, colour = "Observed"), colour = "turquoise") +
-  geom_smooth(aes(x = x, y = y), method = lm, se = FALSE, colour = "blue") +
-  geom_smooth(data = subset(data, observed == TRUE), aes(x = x, y = y), method = lm, se = FALSE, colour = "turquoise")
+  geom_smooth(aes(x = x, y = y), method = lm, colour = "blue") +
+  geom_smooth(data = subset(data, observed == TRUE), aes(x = x, y = y), method = lm, colour = "turquoise")
 
 ```
 
-
-
-
-## Build model
+Fit model to data
 ```{R}
 
-modelString <- "
+modelString = "
   data {
-    int <lower=0> Nobs;
-    vector[Nobs] x;
+    int<lower=0> Nobs;
+    int <lower=0> Ncen;
+    vector[Nobs] xobs;
+    vector[Ncen] xcen;
+    vector[Nobs] yobs;
+    vector[Ncen] ycen;
   }
 
   parameters {
-    real a;
-    real b;
+    real model_a;
+    real model_b;
   }
-  
+
   transformed parameters {
-    real link;
-    
-    link = log(a*x + b);
+    vector[Nobs] linkobs;
+    vector[Ncen] linkcen;
+
+    linkobs = 1 ./ log(1 + exp(model_a*xobs + model_b));
+    linkcen = 1 ./ log(1 + exp(model_a*xcen + model_b));
   }
 
   model {
-    target += exp_pdf(1 / link);
+    target += exponential_lpdf(yobs | linkobs);
+    target += exponential_lccdf(ycen | linkcen);
 
-    a ~ normal(0, 10);
-    b ~ normal(0, 10);
+    model_a ~ normal(0,10);
+    model_b ~ normal(0,10);
   }
 "
 
 uber_model <- rstan::stan_model(model_code = modelString)
 
+```
+
+```{R}
+
+x_obs <- data[data$observed == TRUE,"x"]
+x_cen <- data[data$observed == FALSE,"x"]
+y_obs <- data[data$observed == TRUE,"y"]
+y_cen <- data[data$observed == FALSE,"y_obs"]
+
+
+stan_data_list <- list (Nobs = NROW(x_obs),
+                        Ncen = NROW(x_cen),
+                        xobs = x_obs,
+                        xcen = x_cen,
+                        yobs = y_obs,
+                        ycen = y_cen
+)
 
 ```
+
 
 ## Fit model to data
 ```{R}
 
+output <- rstan::sampling(uber_model, data = stan_data_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
+stan_hist(output, c("model_a", "model_b"))
 ```
 
-## Evaluate goodness of fit
-```{R}
 
-
-
-```
