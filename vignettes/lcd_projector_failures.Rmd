@@ -156,10 +156,38 @@ ggplot(data = data, aes(t)) +
 
 
 
-
 ## Evaluate goodness of fit
 ```{R}
 
+n <- NROW(lcd_projector_failures)
+K <- round(n^0.4)
+a <- seq(0,1,1/K)
+p <- diff(a)
+m <- numeric(K)
+output_vals <- extract(output)
 
+chi_val <- qchisq(0.95,K-1)
+r_b <- numeric(NROW(output_vals$lambda))
+
+for (jj in 1:NROW(r_b)) {
+  
+  thisLambda <- output_vals$lambda[jj]
+  
+  probabilities <- pexp(lcd_projector_failures$projection_hours, thisLambda)
+  
+  for (ii in 1:length(m)){
+    m[ii] <- sum(probabilities > a[ii] & probabilities < a[ii+1])
+  }
+  
+  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
+
+}
+
+```
+
+
+```{R}
+
+sum(r_b > chi_val)/NROW(r_b) * 100
 
 ```
