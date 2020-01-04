@@ -29,8 +29,22 @@
 #'  This dataset are the results from that experiment.
 #'
 #' @format
-#' \describe{A data frame with 31 rows and two columns}
+#' \describe{A data frame with 31 rows and two columns
 #'  \item{lcd_model}{}
 #'  \item{projection_hours}{}
 #' }
 "lcd_projector_failures"
+
+
+#' Failure times (in operating hours) for bearings in 66 prowler attack
+#' aircraft.
+#'
+#' Prowler bearing failure times
+#'
+#' @format
+#' \describe{A data frame with 66 rows and three columns
+#'  \item{prowler_aircraft_id}{}
+#'  \item{operating_hours}{}
+#'  \item{right_censored}{}
+#' }
+"prowler_bearing_failures"

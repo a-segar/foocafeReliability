@@ -68,15 +68,13 @@ modelString = "
     real model_b;
   }
 
-  transformed parameters {
+  model {
     vector[Nobs] linkobs;
     vector[Ncen] linkcen;
 
     linkobs = 1 ./ log(1 + exp(model_a*xobs + model_b));
     linkcen = 1 ./ log(1 + exp(model_a*xcen + model_b));
-  }
-
-  model {
+    
     target += exponential_lpdf(yobs | linkobs);
     target += exponential_lccdf(ycen | linkcen);
 

@@ -4,7 +4,10 @@
 \name{lcd_projector_failures}
 \alias{lcd_projector_failures}
 \title{Failure times (in projection hours) for 31 LCD projector lamps}
-\format{An object of class \code{tbl_df} (inherits from \code{tbl}, \code{data.frame}) with 31 rows and 2 columns.}
+\format{\describe{A data frame with 31 rows and two columns
+\item{lcd_model}{}
+\item{projection_hours}{}
+}}
 \usage{
 lcd_projector_failures
 }

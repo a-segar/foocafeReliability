@@ -143,8 +143,8 @@ temp <- lapply(costTableList, '[', 2) %>% dplyr::bind_cols()
 
 data <- data.frame(t = t,
                    meanVal = apply(temp, 1, mean),
-                   LQ = apply(temp, 1, function(x) {quantile(x, 0.01)}),
-                   UQ = apply(temp, 1, function(x) {quantile(x, 0.99)}))
+                   LQ = apply(temp, 1, function(x) {quantile(x, 0.1)}),
+                   UQ = apply(temp, 1, function(x) {quantile(x, 0.90)}))
 
 
 ggplot(data = data, aes(t)) +

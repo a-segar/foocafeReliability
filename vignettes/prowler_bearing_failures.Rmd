@@ -1,0 +1,161 @@
+---
+title: "prowler_bearing_failures"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{prowler_bearing_failures}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(foocafeReliability)
+library(rstan)
+```
+
+
+## Build model
+```{R}
+
+modelString <- "
+  data {
+    int <lower=0> Nobs;
+    int <lower=0> Ncen;
+    real <lower=0> yobs[Nobs];
+    real <lower=0> ycen[Ncen];
+  }
+
+  parameters {
+    real mu;
+    real sigma;
+  }
+
+  model {
+    target += lognormal_lpdf(yobs | mu, sigma);
+    target += lognormal_lccdf(ycen | mu, sigma);
+
+    mu ~ normal(6.5, 25);
+    sigma ~ inv_gamma(6.5, 23.5);
+  }
+"
+
+prowler_bearing_failures_model <- rstan::stan_model(model_code = modelString)
+
+
+```
+
+## Fit model to data
+```{R}
+failures <- prowler_bearing_failures$operating_hours[prowler_bearing_failures$right_censored == FALSE]
+suspensions <- prowler_bearing_failures$operating_hours[prowler_bearing_failures$right_censored == TRUE]
+
+prowler_bearing_fail_list <- list(Nobs = NROW(failures),
+                            Ncen = NROW(suspensions),
+                            yobs = failures,
+                            ycen = suspensions
+                          )
+
+output <- rstan::sampling(prowler_bearing_failures_model, data = prowler_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+```{R}
+
+costTableList <- list()
+t = seq(1,3500,100)
+
+output_vals <- rstan::extract(output)
+
+for (ii in 1:NROW(output_vals)){
+
+  thisMu <- output_vals$mu[ii]
+  thisSigma <- output_vals$sigma[ii]
+  
+  get_reliability <- function(thisMu, thisSigma){
+    f1 <- function(t){
+      1 - pnorm((log(t) - thisMu)/thisSigma)
+    }
+    return(f1)
+  }
+
+  reliability <- get_reliability(thisMu, thisSigma)
+
+  costTable <- data.frame("t" = t,
+                          "reliability" = numeric(NROW(t)))
+
+  costTable$reliability <- reliability(t)
+  
+  costTableList[[ii]] <- costTable
+}
+
+temp <- lapply(costTableList, '[', 2) %>% dplyr::bind_cols()
+
+data <- data.frame(t = t,
+                   meanVal = apply(temp, 1, mean),
+                   LQ = apply(temp, 1, function(x) {quantile(x, 0.05)}),
+                   UQ = apply(temp, 1, function(x) {quantile(x, 0.95)}))
+
+
+ggplot(data = data, aes(t)) +
+  geom_line(aes(y = meanVal)) +
+  geom_ribbon(aes(ymin = LQ, ymax = UQ), alpha = 0.05)
+  
+
+```
+
+
+## Evaluate goodness of fit
+```{R}
+
+n <- NROW(prowler_bearing_failures)
+K <- round(n^0.4)
+a <- seq(0,1,1/K)
+p <- diff(a)
+m <- numeric(K)
+m2 <- numeric(K)
+output_vals <- rstan::extract(output)
+
+chi_val <- qchisq(0.95,K-1)
+r_b <- numeric(NROW(output_vals$mu))
+r_b2 <- numeric(NROW(output_vals$mu))
+
+for (jj in 1:NROW(r_b)) {
+  
+  thisMu <- output_vals$mu[jj]
+  thisSigma <- output_vals$sigma[jj]
+  
+  probs <- data.frame(
+    probabilities = plnorm(prowler_bearing_failures$operating_hours,
+                                  thisMu, thisSigma)
+    )
+  
+  probs <- probs %>%
+    dplyr::mutate(g = apply(probs, 1, function(x) {runif(1, min = x[1], max = 1)} )) %>% 
+    dplyr::mutate(censored = prowler_bearing_failures$right_censored) %>% 
+    dplyr::mutate(test = ifelse(censored == TRUE, g, probabilities))
+  
+  for (ii in 1:length(m)){
+    m[ii] <- sum(probs$test > a[ii] & probs$test < a[ii+1])
+    m2[ii] <- sum(probs$probabilities > a[ii] & probs$probabilities < a[ii+1])
+  }
+  
+  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
+  r_b2[jj] <- sum(((m2 - n*p)^2)/(n*p))
+
+}
+
+```
+
+
+```{R}
+
+sum(r_b > chi_val)/NROW(r_b) * 100
+sum(r_b2 > chi_val)/NROW(r_b2) * 100
+
+```
