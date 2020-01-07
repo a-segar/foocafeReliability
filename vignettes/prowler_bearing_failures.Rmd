@@ -33,15 +33,18 @@ modelString <- "
 
   parameters {
     real mu;
-    real sigma;
+    real <lower=0> sigma_2;
   }
 
   model {
+    real sigma;
+    sigma = sqrt(sigma_2);
+    
     target += lognormal_lpdf(yobs | mu, sigma);
     target += lognormal_lccdf(ycen | mu, sigma);
 
     mu ~ normal(6.5, 25);
-    sigma ~ inv_gamma(6.5, 23.5);
+    sigma_2 ~ inv_gamma(6.5, 23.5);
   }
 "
 
@@ -75,7 +78,7 @@ output_vals <- rstan::extract(output)
 for (ii in 1:NROW(output_vals)){
 
   thisMu <- output_vals$mu[ii]
-  thisSigma <- output_vals$sigma[ii]
+  thisSigma <- sqrt(output_vals$sigma_2[ii])
   
   get_reliability <- function(thisMu, thisSigma){
     f1 <- function(t){
@@ -128,7 +131,7 @@ r_b2 <- numeric(NROW(output_vals$mu))
 for (jj in 1:NROW(r_b)) {
   
   thisMu <- output_vals$mu[jj]
-  thisSigma <- output_vals$sigma[jj]
+  thisSigma <- sqrt(output_vals$sigma_2[jj])
   
   probs <- data.frame(
     probabilities = plnorm(prowler_bearing_failures$operating_hours,

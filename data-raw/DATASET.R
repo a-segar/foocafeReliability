@@ -40,7 +40,7 @@ usethis::use_data(prowler_bearing_failures, overwrite = TRUE)
 
 ## lubricant_bearing_failures
 
-lubricant_bearings_failures <- tibble::tibble(
+lubricant_bearing_failures <- tibble::tibble(
   failure_times = c(130.3,135.2,152.4,161.7,74.0,155.0,141.2,167.8,137.2,110.1,
                     243.6,242.1,239.0,202.1,190.5,159.8,275.5,192.4,183.8,203.7,
                     71.3,137.8,101.2,75.3,164.5,113.9,54.7,224.0,171.7,226.5,
@@ -54,4 +54,4 @@ lubricant_bearings_failures <- tibble::tibble(
   tester = rep(seq(1,10),each=10)
 )
 
-usethis::use_data(lubricant_bearings_failures, overwrite = TRUE)
+usethis::use_data(lubricant_bearing_failures, overwrite = TRUE)
