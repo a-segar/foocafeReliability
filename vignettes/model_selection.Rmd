@@ -1,0 +1,135 @@
+---
+title: "lubricant_bearings_failures"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{model_selection}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(foocafeReliability)
+library(rstan)
+```
+
+
+```{R}
+data <- rweibull(n = 25, shape = 2, scale = 4)
+
+```
+
+```{R}
+
+modelString = "
+  data {
+    int N; //the number of observations
+    vector[N] y; //the response variable
+  }
+  
+  parameters {
+    real<lower=0> shape;
+    real<lower=0> scale;
+  }
+  
+  model {
+    shape ~ gamma(2, 2);
+    scale ~ inv_gamma(0.1,0.1);
+    
+    target += weibull_lpdf(y | shape, scale);
+  }
+"
+
+weibull_model <- rstan::stan_model(model_code = modelString)
+
+
+data_list <- list(N = NROW(data),
+                  y = data)
+
+weibull_output <- rstan::sampling(weibull_model, data = data_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+
+```{R}
+
+modelString = "
+  data {
+    int N; //the number of observations
+    vector[N] y; //the response variable
+  }
+  
+  parameters {
+    real<lower=0> lambda;
+  }
+  
+  model {
+    lambda ~ gamma(0.3, 2);
+    
+    target += exponential_lpdf(y | lambda);
+  }
+"
+
+exponential_model <- rstan::stan_model(model_code = modelString)
+
+
+data_list <- list(N = NROW(data),
+                  y = data)
+
+exponential_output <- rstan::sampling(exponential_model, data = data_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+```{R}
+
+stan_hist(weibull_output)
+
+stan_hist(exponential_output)
+
+```
+
+
+```{R}
+
+weib <- rstan::extract(weibull_output)
+shape <- mean(weib$shape)
+scale <- mean(weib$scale)
+weibull_BIC <- -2*log(prod(dweibull(data, shape, scale))) + log(NROW(data))*2
+
+
+expo <- rstan::extract(exponential_output)
+lambda <- mean(expo$lambda)
+exponential_BIC <- -2*log(prod(dexp(data, lambda))) + log(NROW(data))*1
+
+```
+
+
+
+# Comparison between exponential, weibull, and lognormal fits to 
+# lcd_projector_failures data
+(note that lcd_projector_failures vignette needs to be run first)
+
+```{R}
+
+weib <- rstan::extract(lcd_weibull_output)
+shape <- mean(weib$shape)
+scale <- mean(weib$scale)
+(weibull_BIC <- -2*log(prod(dweibull(data, shape, scale))) + log(NROW(data))*2)
+
+expo <- rstan::extract(lcd_exponential_output)
+lambda <- mean(expo$lambda)
+(exponential_BIC <- -2*log(prod(dexp(data, lambda))) + log(NROW(data))*1)
+
+logn <- rstan::extract(lcd_lognormal_output)
+mu <- mean(logn$mu)
+sigma <- mean(logn$sigma)
+(weibull_BIC <- -2*log(prod(dlnorm(data, mu, sigma))) + log(NROW(data))*2)
+
+
+```

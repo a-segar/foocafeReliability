@@ -125,6 +125,7 @@ modelString = "
   }
   
   parameters {
+    real<lower=0> test_prior;
     real<lower=0> test_prior_lnorm;
     real<lower=0> test_prior_gamma;
     real<lower=0> test_prior_gamma2;
@@ -132,8 +133,9 @@ modelString = "
   }
   
   model {
+    test_prior ~ gamma(2.5,2350);
     test_prior_lnorm ~ lognormal(5, 0.5);
-    test_prior_gamma ~ gamma(5, 0.6);
+    test_prior_gamma ~ gamma(2.5, 0.6);
     test_prior_gamma2 ~ gamma(2, 1);
     test_prior_uniform ~ uniform(0,100);
   }
@@ -348,3 +350,5 @@ for (jj in 1:NROW(r_b)) {
 sum(r_b > chi_val)/NROW(r_b) * 100
 
 ```
+
+

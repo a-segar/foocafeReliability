@@ -31,8 +31,6 @@ modelString <- "
 
   parameters {
     real <lower=0> lambda;
-    
-    real <lower=0> lambda_prior;
   }
   
   transformed parameters {
@@ -45,11 +43,10 @@ modelString <- "
     projection_hours ~ exponential(lambda);
 
     lambda ~ gamma(2.5, 2350);
-    lambda_prior ~ gamma(2.5,2350);
   }
 "
 
-lcd_projector_failures_model <- rstan::stan_model(model_code = modelString)
+lcd_exponential_model <- rstan::stan_model(model_code = modelString)
 
 
 ```
@@ -61,7 +58,7 @@ lcd_fail_list <- list(Nobs = NROW(lcd_projector_failures$projection_hours),
                           projection_hours = lcd_projector_failures$projection_hours
                           )
 
-output <- rstan::sampling(lcd_projector_failures_model, data = lcd_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+lcd_exponential_output <- rstan::sampling(lcd_exponential_model, data = lcd_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
 ```
 
@@ -164,7 +161,7 @@ K <- round(n^0.4)
 a <- seq(0,1,1/K)
 p <- diff(a)
 m <- numeric(K)
-output_vals <- extract(output)
+output_vals <- rstan::extract(lcd_exponential_output)
 
 chi_val <- qchisq(0.95,K-1)
 r_b <- numeric(NROW(output_vals$lambda))
@@ -189,5 +186,149 @@ for (jj in 1:NROW(r_b)) {
 ```{R}
 
 sum(r_b > chi_val)/NROW(r_b) * 100
+
+```
+
+
+
+### Weibull fit:
+
+## Build model
+```{R}
+
+modelString <- "
+  data {
+    int<lower=0> Nobs;
+    vector<lower=0>[Nobs] projection_hours;
+  }
+
+  parameters {
+    real<lower=0> shape;
+    real<lower=0> scale;
+    
+  }
+
+  model {
+    target += weibull_lpdf(projection_hours | shape, scale);
+
+    shape ~ gamma(1, 1);
+    scale ~ gamma(2.5, 0.006);
+  }
+"
+
+lcd_weibull_model <- rstan::stan_model(model_code = modelString)
+
+lcd_fail_list <- list(Nobs = NROW(lcd_projector_failures$projection_hours),
+                          projection_hours = lcd_projector_failures$projection_hours
+                          )
+
+lcd_weibull_output <- rstan::sampling(lcd_weibull_model, data = lcd_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+## Evaluate goodness of fit
+```{R}
+
+n <- NROW(lcd_projector_failures)
+K <- round(n^0.4)
+a <- seq(0,1,1/K)
+p <- diff(a)
+m <- numeric(K)
+output_vals <- rstan::extract(lcd_weibull_output)
+
+chi_val <- qchisq(0.95,K-1)
+r_b <- numeric(NROW(output_vals$shape))
+
+for (jj in 1:NROW(r_b)) {
+  
+  thisShape <- output_vals$shape[jj]
+  thisScale <- output_vals$scale[jj]
+  
+  probabilities <- pweibull(lcd_projector_failures$projection_hours, thisShape, thisScale)
+  
+  for (ii in 1:length(m)){
+    m[ii] <- sum(probabilities > a[ii] & probabilities < a[ii+1])
+  }
+  
+  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
+
+}
+
+(sum(r_b > chi_val)/NROW(r_b) * 100)
+
+```
+
+
+### lognormal fit:
+
+## Build model
+```{R}
+
+modelString <- "
+  data {
+    int<lower=0> Nobs;
+    vector<lower=0>[Nobs] projection_hours;
+  }
+
+  parameters {
+    real mu;
+    real sigma_2;
+  }
+  
+  transformed parameters {
+    real<lower=0> sigma;
+    
+    sigma = sqrt(sigma_2);
+  }
+
+  model {
+    
+    target += lognormal_lpdf(projection_hours | mu, sigma);
+
+    mu ~ normal(6, 5);
+    sigma_2 ~ inv_gamma(6.5, 23.5);
+  }
+"
+
+lcd_lognormal_model <- rstan::stan_model(model_code = modelString)
+
+lcd_fail_list <- list(Nobs = NROW(lcd_projector_failures$projection_hours),
+                          projection_hours = lcd_projector_failures$projection_hours
+                          )
+
+lcd_lognormal_output <- rstan::sampling(lcd_lognormal_model, data = lcd_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+
+## Evaluate goodness of fit
+```{R}
+
+n <- NROW(lcd_projector_failures)
+K <- round(n^0.4)
+a <- seq(0,1,1/K)
+p <- diff(a)
+m <- numeric(K)
+output_vals <- rstan::extract(lcd_lognormal_output)
+
+chi_val <- qchisq(0.95,K-1)
+r_b <- numeric(NROW(output_vals$mu))
+
+for (jj in 1:NROW(r_b)) {
+  
+  thisMu <- output_vals$mu[jj]
+  thisSigma <- output_vals$sigma[jj]
+  
+  probabilities <- plnorm(lcd_projector_failures$projection_hours, thisMu, thisSigma)
+  
+  for (ii in 1:length(m)){
+    m[ii] <- sum(probabilities > a[ii] & probabilities < a[ii+1])
+  }
+  
+  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
+
+}
+
+(sum(r_b > chi_val)/NROW(r_b) * 100)
 
 ```
