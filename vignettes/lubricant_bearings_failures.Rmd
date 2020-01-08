@@ -45,7 +45,7 @@ lubricant_bearing_failures
 
 Used example from https://www.r-bloggers.com/hierarchical-models-with-rstan-part-1/
 
-## Model from book:
+## Model from book (couldn't get the scale parameter results to match the books):
 ```{R}
 
 modelString = "
@@ -97,6 +97,17 @@ modelString = "
     target += weibull_lpdf(y | beta, scale);
   }
 "
+
+lubricant_bearing_failures_model <- rstan::stan_model(model_code = modelString)
+
+
+lubricant_bearing_fail_list <- list(N = NROW(lubricant_bearing_failures$failure_times),
+                            J = NROW(unique(lubricant_bearing_failures$tester)),
+                            id = lubricant_bearing_failures$tester,
+                            y = lubricant_bearing_failures$failure_times
+                          )
+
+output <- rstan::sampling(lubricant_bearing_failures_model, data = lubricant_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
 ```
 
@@ -246,14 +257,17 @@ output2 <- rstan::sampling(lubricant_bearing_failures_model2, data = lubricant_b
 ```{R}
 
 costTableList <- list()
+dataList <- list()
+
 t = c(50, 100, 150, 200)
 
 output_vals <- rstan::extract(output)
 
-for (ii in 1:NROW(output_vals)){
+for (kk in 1:10){
+  for (jj in 1:NROW(output_vals)){
 
-  thisShape <- output_vals$beta[ii]
-  thisScale <- output_vals$alpha[ii]
+  thisShape <- output_vals$beta[jj]
+  thisScale <- output_vals$alpha[kk,jj]
   
   get_reliability <- function(thisShape, thisScale){
     f1 <- function(t){
@@ -269,16 +283,22 @@ for (ii in 1:NROW(output_vals)){
 
   costTable$reliability <- reliability(t)
   
-  costTableList[[ii]] <- costTable
+  costTableList[[jj]] <- costTable
+  }
+  
+  temp <- lapply(costTableList, '[', 2) %>% dplyr::bind_cols()
+  
+  data <- data.frame(t = t,
+                     meanVal = apply(temp, 1, mean),
+                     LQ = apply(temp, 1, function(x) {quantile(x, 0.05)}),
+                     UQ = apply(temp, 1, function(x) {quantile(x, 0.95)}))
+  
+  dataList[[kk]] <- data
+    
 }
 
-temp <- lapply(costTableList, '[', 2) %>% dplyr::bind_cols()
-
-data <- data.frame(t = t,
-                   meanVal = apply(temp, 1, mean),
-                   LQ = apply(temp, 1, function(x) {quantile(x, 0.05)}),
-                   UQ = apply(temp, 1, function(x) {quantile(x, 0.95)}))
-
+data <- plyr::aaply(plyr::laply(dataList, as.matrix), c(2, 3), mean) %>%
+  as.data.frame()
 
 ggplot(data = data, aes(t)) +
   geom_line(aes(y = meanVal)) +
