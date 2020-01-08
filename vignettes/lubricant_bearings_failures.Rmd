@@ -33,68 +33,52 @@ modelString = "
     int id[N]; //vector of tester indices
     vector[N] y; //the response variable
   }
+  
   parameters {
-    real <lower=0> sigma_2;
+    real<lower=0> sigma_2;
   
     vector[J] gamma;
     real mu;
     
-    real <lower=0> beta; 
+    real<lower=0> beta;
   }
+  
+  transformed parameters {
+    real sigma;
+    
+    sigma = sqrt(sigma_2);
+  }
+  
   model {
     vector[N] log_alpha;
     vector[N] alpha;
-    
-    real sigma;
+    vector[N] scale;
     
     //priors
-    sigma_2 ~ inv_gamma(0.001, 0.001);
-    sigma = sqrt(sigma_2);
+    sigma_2 ~ inv_gamma(0.1, 0.1);
     
-    mu ~ normal(0, 1000);
+    mu ~ normal(0, sqrt(1000));
     beta ~ gamma(1.5, 0.5);
     
     for(j in 1:J){
-     gamma[j] ~ normal(0, sigma); 
+      gamma[j] ~ normal(0, sigma); 
     }
     
     for(n in 1:N){
-      //log_alpha[n] = mu + gamma[id[n]];
-      //alpha[n] = exp(log_alpha[n]);
+      log_alpha[n] = mu + gamma[id[n]];
+      alpha[n] = exp(log_alpha[n]);
       
-      alpha[n] ~ lognormal(mu, sigma);
+      scale[n] = pow(alpha[n], beta);
     }
-  
-    //likelihood
-    target += weibull_lpdf(y | alpha, beta);
-  }
-"
-
-modelString = "
-  data {
-    int N; //the number of observations
-    int J; //the number of testers
-    int id[N]; //vector of tester indices
-    vector[N] y; //the response variable
-  }
-  parameters {
-    real <lower=0> sigma_2;
-  
-  }
-  model {
-
-    sigma_2 ~ inv_gamma(0.001, 0.001);
     
+    //likelihood
+    target += weibull_lpdf(y | beta, scale);
   }
 "
 
 lubricant_bearing_failures_model <- rstan::stan_model(model_code = modelString)
 
-```
 
-
-## Fit model to data
-```{R}
 lubricant_bearing_fail_list <- list(N = NROW(lubricant_bearing_failures$failure_times),
                             J = NROW(unique(lubricant_bearing_failures$tester)),
                             id = lubricant_bearing_failures$tester,
