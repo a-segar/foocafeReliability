@@ -20,10 +20,32 @@ library(rstan)
 ```
 
 
+Ku et al. (1972) reports on fatigue testing of bearings used with a particular
+lubricant and assumes that the failure times follow a Weibull distribution. The
+experimenters used 10 testers, bench-type rigs, and found that the testers
+impacted the measured failure times. The dataset 'lubricant_bearing_failures'
+presents the bearing failure time data (in hours) that they collected when they
+used an aviation gas turbine lubricant O-64-2. The experimenters want to
+determine the bearing failure time distribution when they use the bearings with
+O-64-2, by removing the tester effect. In analysing these data, we can account 
+for the tester-to-tester differences by specifying
+
+Y ~ Weibull(alpha_i, beta)
+
+where y_ij is the jth observed failure time from the i-th tester. Note that this
+model specification used the first parametrisation of the Weibull distribution 
+given in Appendix B. Further, we model the logged scale parameter alpha_i by:
+
+
+```{R}
+lubricant_bearing_failures
+```
+
+
 
 Used example from https://www.r-bloggers.com/hierarchical-models-with-rstan-part-1/
 
-## Build model
+## Model from book:
 ```{R}
 
 modelString = "
@@ -55,7 +77,7 @@ modelString = "
     vector[N] scale;
     
     //priors
-    sigma_2 ~ inv_gamma(0.1, 0.1);
+    sigma_2 ~ inv_gamma(0.01, 0.01);
     
     mu ~ normal(0, sqrt(1000));
     beta ~ gamma(1.5, 0.5);
@@ -76,6 +98,86 @@ modelString = "
   }
 "
 
+```
+
+
+
+# Experimenting with priors
+```{R}
+
+modelString = "
+  data {
+    int N; //the number of observations
+    int J; //the number of testers
+    int id[N]; //vector of tester indices
+    vector[N] y; //the response variable
+  }
+  
+  parameters {
+    real<lower=0> test_prior_lnorm;
+    real<lower=0> test_prior_gamma;
+    real<lower=0> test_prior_gamma2;
+    real<lower=0> test_prior_uniform;
+  }
+  
+  model {
+    test_prior_lnorm ~ lognormal(5, 0.5);
+    test_prior_gamma ~ gamma(5, 0.6);
+    test_prior_gamma2 ~ gamma(2, 1);
+    test_prior_uniform ~ uniform(0,100);
+  }
+"
+lubricant_bearing_failures_model2 <- rstan::stan_model(model_code = modelString)
+
+
+lubricant_bearing_fail_list <- list(N = NROW(lubricant_bearing_failures$failure_times),
+                            J = NROW(unique(lubricant_bearing_failures$tester)),
+                            id = lubricant_bearing_failures$tester,
+                            y = lubricant_bearing_failures$failure_times
+                          )
+
+output2 <- rstan::sampling(lubricant_bearing_failures_model2, data = lubricant_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+# Model 1
+```{R}
+
+modelString = "
+  data {
+    int N; //the number of observations
+    int J; //the number of testers
+    int id[N]; //vector of tester indices
+    vector[N] y; //the response variable
+  }
+  
+  parameters {
+    vector<lower=0>[J] alpha;
+    real<lower=0> beta;
+    
+    real mu;
+    real sigma;
+  }
+  
+  model {
+    vector[N] scale;
+    
+    beta ~ gamma(1.5, 0.5);
+    mu ~ gamma(2,1);
+    sigma ~ uniform(0, 100);
+    
+    for(j in 1:J){
+      alpha[j] ~ lognormal(mu, sigma);
+    }
+    
+    for (n in 1:N)
+      scale[n] = alpha[id[n]];
+    
+    //likelihood
+    target += weibull_lpdf(y | beta, scale);
+  }
+"
+
 lubricant_bearing_failures_model <- rstan::stan_model(model_code = modelString)
 
 
@@ -85,30 +187,82 @@ lubricant_bearing_fail_list <- list(N = NROW(lubricant_bearing_failures$failure_
                             y = lubricant_bearing_failures$failure_times
                           )
 
-output <- rstan::sampling(lubricant_bearing_failures_model, data = lubricant_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+output <- rstan::sampling(lubricant_bearing_failures_model1, data = lubricant_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
 ```
+
+# Model 2
+```{R}
+
+modelString = "
+  data {
+    int N; //the number of observations
+    int J; //the number of testers
+    int id[N]; //vector of tester indices
+    vector[N] y; //the response variable
+  }
+  
+  parameters {
+    vector<lower=0>[J] alpha;
+    real<lower=0> beta;
+    
+    real mu;
+    real sigma;
+  }
+  
+  model {
+    vector[N] scale;
+    
+    beta ~ gamma(1.5, 0.5);
+    mu ~ gamma(2,1);
+    sigma ~ inv_gamma(0.1, 0.1);
+    
+    for(j in 1:J){
+      alpha[j] ~ lognormal(mu, sigma);
+    }
+    
+    for (n in 1:N)
+      scale[n] = alpha[id[n]];
+    
+    //likelihood
+    target += weibull_lpdf(y | beta, scale);
+  }
+"
+
+lubricant_bearing_failures_model2 <- rstan::stan_model(model_code = modelString)
+
+
+lubricant_bearing_fail_list <- list(N = NROW(lubricant_bearing_failures$failure_times),
+                            J = NROW(unique(lubricant_bearing_failures$tester)),
+                            id = lubricant_bearing_failures$tester,
+                            y = lubricant_bearing_failures$failure_times
+                          )
+
+output2 <- rstan::sampling(lubricant_bearing_failures_model2, data = lubricant_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
 
 ```{R}
 
 costTableList <- list()
-t = seq(1,3500,100)
+t = c(50, 100, 150, 200)
 
 output_vals <- rstan::extract(output)
 
 for (ii in 1:NROW(output_vals)){
 
-  thisMu <- output_vals$mu[ii]
-  thisSigma <- output_vals$sigma[ii]
+  thisShape <- output_vals$beta[ii]
+  thisScale <- output_vals$alpha[ii]
   
-  get_reliability <- function(thisMu, thisSigma){
+  get_reliability <- function(thisShape, thisScale){
     f1 <- function(t){
-      1 - pnorm((log(t) - thisMu)/thisSigma)
+      exp(-((t/thisScale)^thisShape))
     }
     return(f1)
   }
 
-  reliability <- get_reliability(thisMu, thisSigma)
+  reliability <- get_reliability(thisShape, thisScale)
 
   costTable <- data.frame("t" = t,
                           "reliability" = numeric(NROW(t)))
@@ -137,49 +291,40 @@ ggplot(data = data, aes(t)) +
 ## Evaluate goodness of fit
 ```{R}
 
-n <- NROW(prowler_bearing_failures)
+n <- NROW(lubricant_bearing_failures)
 K <- round(n^0.4)
 a <- seq(0,1,1/K)
 p <- diff(a)
+
+probabilities <- numeric(n)
 m <- numeric(K)
-m2 <- numeric(K)
+m_temp <- numeric()
 output_vals <- rstan::extract(output)
 
 chi_val <- qchisq(0.95,K-1)
-r_b <- numeric(NROW(output_vals$mu))
-r_b2 <- numeric(NROW(output_vals$mu))
+r_b <- numeric(NROW(output_vals[[1]]))
 
 for (jj in 1:NROW(r_b)) {
   
-  thisMu <- output_vals$mu[jj]
-  thisSigma <- output_vals$sigma[jj]
+  thisShape <- output_vals$beta[jj]
+  thisScale <- output_vals$alpha[jj,]
   
-  probs <- data.frame(
-    probabilities = plnorm(prowler_bearing_failures$operating_hours,
-                                  thisMu, thisSigma)
-    )
-  
-  probs <- probs %>%
-    dplyr::mutate(g = apply(probs, 1, function(x) {runif(1, min = x[1], max = 1)} )) %>% 
-    dplyr::mutate(censored = prowler_bearing_failures$right_censored) %>% 
-    dplyr::mutate(test = ifelse(censored == TRUE, g, probabilities))
+  for (ii in 1:length(lubricant_bearing_failures$failure_times)){
+    probabilities[ii] <- pweibull(lubricant_bearing_failures$failure_times[ii],
+                                  thisShape,
+                                  thisScale[lubricant_bearing_failures$tester[ii]])
+  }
   
   for (ii in 1:length(m)){
-    m[ii] <- sum(probs$test > a[ii] & probs$test < a[ii+1])
-    m2[ii] <- sum(probs$probabilities > a[ii] & probs$probabilities < a[ii+1])
+    m[ii] <- sum(probabilities > a[ii] & probabilities < a[ii+1])
   }
   
   r_b[jj] <- sum(((m - n*p)^2)/(n*p))
-  r_b2[jj] <- sum(((m2 - n*p)^2)/(n*p))
+  
+  m_temp <- rbind(m_temp, m)
 
 }
 
-```
-
-
-```{R}
-
 sum(r_b > chi_val)/NROW(r_b) * 100
-sum(r_b2 > chi_val)/NROW(r_b2) * 100
 
 ```
