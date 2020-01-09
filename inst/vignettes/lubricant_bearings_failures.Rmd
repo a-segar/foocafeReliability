@@ -156,6 +156,8 @@ output2 <- rstan::sampling(lubricant_bearing_failures_model2, data = lubricant_b
 # Model 1
 ```{R}
 
+library(foocafeReliability)
+
 modelString = "
   data {
     int N; //the number of observations
@@ -200,7 +202,7 @@ lubricant_bearing_fail_list <- list(N = NROW(lubricant_bearing_failures$failure_
                             y = lubricant_bearing_failures$failure_times
                           )
 
-output <- rstan::sampling(lubricant_bearing_failures_model1, data = lubricant_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+output <- rstan::sampling(lubricant_bearing_failures_model, data = lubricant_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
 ```
 
@@ -223,9 +225,14 @@ modelString = "
     real sigma;
   }
   
-  model {
+  transformed parameters {
     vector[N] scale;
     
+    for (n in 1:N)
+      scale[n] = alpha[id[n]];
+  }
+  
+  model {
     beta ~ gamma(1.5, 0.5);
     mu ~ gamma(2,1);
     sigma ~ inv_gamma(0.1, 0.1);
@@ -234,11 +241,16 @@ modelString = "
       alpha[j] ~ lognormal(mu, sigma);
     }
     
-    for (n in 1:N)
-      scale[n] = alpha[id[n]];
-    
     //likelihood
     target += weibull_lpdf(y | beta, scale);
+  }
+  
+  generated quantities {
+    //sample predicted values from the model for posterior predictive checks
+    real y_rep[N];
+    
+    for(n in 1:N)
+      y_rep[n] = weibull_rng(beta, scale[n]);
   }
 "
 
