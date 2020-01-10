@@ -20,7 +20,7 @@ library(rstan)
 ```
 
 
-## Build model
+## Build model  Censored Data Example Ex 4.6 from Bayesian Reliabilty
 ```{R}
 
 modelString <- "
