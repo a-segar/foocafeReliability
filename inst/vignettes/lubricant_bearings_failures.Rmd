@@ -45,7 +45,8 @@ lubricant_bearing_failures
 
 Used example from https://www.r-bloggers.com/hierarchical-models-with-rstan-part-1/
 
-## Model from book (couldn't get the scale parameter results to match the books):
+## Model from book (couldn't get the scale parameter results to match the books based on Ex. 4.8 Bayesian Relaibility):
+## The goal is to show how to model with different subgroups
 ```{R}
 
 modelString = "

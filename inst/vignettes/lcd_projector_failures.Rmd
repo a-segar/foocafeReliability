@@ -20,7 +20,7 @@ library(rstan)
 ```
 
 
-## Build model
+## Build model  (based on example 4.3 from Bayesian Reliability)
 ```{R}
 
 modelString <- "
