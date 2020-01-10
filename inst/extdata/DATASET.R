@@ -55,3 +55,4 @@ lubricant_bearing_failures <- tibble::tibble(
 )
 
 usethis::use_data(lubricant_bearing_failures, overwrite = TRUE)
+

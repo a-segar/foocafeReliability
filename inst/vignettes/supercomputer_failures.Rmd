@@ -65,6 +65,8 @@ output <- rstan::sampling(supercomputer_failures_model, data = supercomp_fail_li
 ```
 
 ## Evaluate goodness of fit
+
+Note that the modified r_b for discrete data has been used
 ```{R}
 
 n <- NROW(supercomputer_failures)
@@ -72,12 +74,10 @@ K <- round(n^0.4)
 a <- seq(0,1,1/K)
 p <- diff(a)
 m <- numeric(K)
-m2 <- numeric(K)
 output_vals <- rstan::extract(output)
 
 chi_val <- qchisq(0.95,K-1)
 r_b <- numeric(NROW(output_vals$lambda))
-r_b2 <- numeric(NROW(output_vals$lambda))
 
 for (jj in 1:NROW(r_b)) {
   
@@ -95,21 +95,75 @@ for (jj in 1:NROW(r_b)) {
   
   for (ii in 1:length(m)){
     m[ii] <- sum(probs$g > a[ii] & probs$g < a[ii+1])
-    m2[ii] <- sum(probs$probabilities > a[ii] & probs$probabilities < a[ii+1])
   }
   
   r_b[jj] <- sum(((m - n*p)^2)/(n*p))
-  r_b2[jj] <- sum(((m2 - n*p)^2)/(n*p))
 
 }
 
 sum(r_b > chi_val)/NROW(r_b) * 100
-sum(r_b2 > chi_val)/NROW(r_b2) * 100
+
+```
+
+```{R}
+y <- supercomputer_failures$failure_count
+stan_model_output <- output
+
+get_bayesian_chi_squared <- function(y, posterior_type, posterior_sample_params){
+  
+}
+
+# Neccessary parameters need to be specified
+#   They then need to be given names according to the distribution they will
+#   be used with. 
+
+posterior_sample_params <- data.frame(lambda = rstan::extract(stan_model_output)$lambda)
+
+posterior_sample_params <- data.frame(lambda = stan_model_output_vals$lambda,
+                     lambda = stan_model_output_vals$lambda + 1)
+
+
+#function starts:
+
+n <- NROW(y)
+K <- round(n^0.4)
+a <- seq(0,1,1/K)
+p <- diff(a)
+m <- numeric(K)
+
+chi_val <- qchisq(0.95,K-1)
+r_b <- numeric(NROW(posterior_sample_params))
+
+for (jj in 1:NROW(r_b)) {
+  
+  thisParams <- params[jj,]
+  this_dist_fun <- get_dist_fun("poisson", thisParams)
+  
+  probs <- data.frame(
+    probabilities_minus_1 = this_dist_fun(supercomputer_failures$failure_count[1] - 1),
+    
+    probabilities = ppois(supercomputer_failures$failure_count,
+                          thisLambda)
+    )
+  
+  probs <- probs %>% dplyr::mutate(g = apply(probs, 1, function(x) {runif(1, min = x[1], max = x[2])} ))
+  
+  
+  for (ii in 1:length(m)){
+    m[ii] <- sum(probs$g > a[ii] & probs$g < a[ii+1])
+  }
+  
+  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
+
+}
+
+sum(r_b > chi_val)/NROW(r_b) * 100
 
 ```
 
 
 
+## shinystan for model review:
 ```{R}
 y <- supercomputer_failures$failure_count
 shinystan::launch_shinystan(output)

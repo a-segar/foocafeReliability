@@ -206,6 +206,13 @@ output <- rstan::sampling(lubricant_bearing_failures_model, data = lubricant_bea
 
 ```
 
+```{R}
+
+supercomputer_failures_model
+
+```
+
+
 # Model 2
 ```{R}
 
