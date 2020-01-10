@@ -46,6 +46,19 @@ modelString <- "
     mu ~ normal(6.5, 25);
     sigma_2 ~ inv_gamma(6.5, 23.5);
   }
+  
+  generated quantities {
+  
+    
+    //sample predicted values from the model for posterior predictive checks
+    real y_rep[Nobs+Ncen];
+    
+    real sigma;
+    sigma = sqrt(sigma_2);
+    
+    for(n in 1:(Nobs+Ncen))
+      y_rep[n] = lognormal_rng(mu, sigma);
+  }
 "
 
 prowler_bearing_failures_model <- rstan::stan_model(model_code = modelString)
@@ -160,5 +173,56 @@ for (jj in 1:NROW(r_b)) {
 
 sum(r_b > chi_val)/NROW(r_b) * 100
 sum(r_b2 > chi_val)/NROW(r_b2) * 100
+
+```
+
+
+```{R}
+
+get_inv_weibull_cdf <- function(shape, scale){
+  output_fun <- function(U){
+    ((-log(1 - U))^(-shape))*scale
+  }
+  return(output_fun)
+}
+```
+
+
+```{R}
+
+output_vals <- extract(output, c("mu", "sigma"))
+
+y = prowler_bearing_failures$operating_hours
+
+censored_data <- y[prowler_bearing_failures$right_censored == TRUE]
+
+generated_y <- numeric(NROW(censored_data))
+
+for (ii in 1:NROW(censored_data)){
+  this_U = runif(1, plnorm(censored_data[ii],output_vals$mu[jj], output_vals$sigma[jj]), 1)
+  generated_y[ii] <- as.numeric(quantile(rlnorm(100000, output_vals$mu[jj], output_vals$sigma[jj]), this_U))
+}
+
+y_new <- y
+y_new[prowler_bearing_failures$right_censored == TRUE] <- generated_y
+  
+```
+
+
+```{R}
+
+library(bayesplot)
+
+x <- list(y = y_new,
+          yrep = rstan::extract(output, "y_rep")$y_rep)
+class(x) <- "foo"
+pp_check.foo <- function(object, ..., type = c("multiple", "overlaid")) {
+    y <- object[["y"]]
+    yrep <- object[["yrep"]]
+    switch(match.arg(type),
+           multiple = ppc_hist(y, yrep[1:min(8, nrow(yrep)),, drop = FALSE]),
+           overlaid = ppc_dens_overlay(y, yrep[1:100,, drop = FALSE]))
+}
+pp_check(x, type = "overlaid")
 
 ```
