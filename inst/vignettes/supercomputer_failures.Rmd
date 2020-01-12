@@ -113,16 +113,24 @@ stan_model_output <- output
 
 get_bayesian_chi_squared <- function(y, posterior_type, posterior_sample_params){
   
+  # "poisson", thisParams
+  
+  
 }
 
 # Neccessary parameters need to be specified
 #   They then need to be given names according to the distribution they will
 #   be used with. 
 
-posterior_sample_params <- data.frame(lambda = rstan::extract(stan_model_output)$lambda)
+posterior_sample_params <- data.frame(lambda = rstan::extract(stan_model_output)["lambda"])
 
-posterior_sample_params <- data.frame(lambda = stan_model_output_vals$lambda,
-                     lambda = stan_model_output_vals$lambda + 1)
+posterior_sample_params <- data.frame(lambda = rstan::extract(stan_model_output)["lambda"],
+                     lambda2 = rstan::extract(stan_model_output)["lambda"])
+
+params <- data.frame("meanlog" = rstan::extract(output)["mu"],
+                     "sdlog" = rstan::extract(output)["sigma"])
+colnames(params) <- c("meanlog","sdlog")
+
 
 
 #function starts:
@@ -138,13 +146,20 @@ r_b <- numeric(NROW(posterior_sample_params))
 
 for (jj in 1:NROW(r_b)) {
   
-  thisParams <- params[jj,]
-  this_dist_fun <- get_dist_fun("poisson", thisParams)
+  this_dist_fun <- get_dist_fun("poisson", posterior_sample_params[jj,,drop = FALSE])
   
+  
+  # Here you need to write the specific process needed for each of the three cases:
+  #   - Continuous
+  #   - Discrete
+  #   - Censored (right and left)
+  
+  
+  # Probabilities are calculated - these are specific to the case considered (here discrete)
   probs <- data.frame(
     probabilities_minus_1 = this_dist_fun(supercomputer_failures$failure_count[1] - 1),
     
-    probabilities = ppois(supercomputer_failures$failure_count,
+    probabilities = this_dist_fun(supercomputer_failures$failure_count,
                           thisLambda)
     )
   
