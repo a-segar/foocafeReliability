@@ -12,7 +12,23 @@
 
 # Note that names of columns in the parameter dataframe should match those used in the function specified.
 
-get_bayesian_chi_squared(data, distribution_fun, params, test_type, censored = NULL, chisq_quantile = 0.95){
+#' Bayesian Chi-squared test
+#'
+#' @param y Independent and identically distributed samples drawn from a given distribution
+#' @param distribution_fun The cumulative distribution function of the model posterior.
+#' @param params Randomly sampled draws of from the parameters posterior distribution.
+#' @param data_type There are three choices of data_type; "continuous", "discrete", and "censored".
+#' @param censored A vector the same length as y indicating whether the data is censored.
+#' @param chisq_quantile Quantile of the Chi-squared distribution to be used in the test.
+#'
+#' @return The proportion of R^b values that exceed the specified critical value from
+#'  their known Chi-squared reference distribution.
+#' @export
+#'
+#'
+
+
+bayesian_chi_squared_test <- function(y, distribution_fun, params, data_type = "continuous", censored = NULL, chisq_quantile = 0.95){
 
   n <- NROW(y)
   K <- round(n^0.4)
@@ -41,24 +57,19 @@ get_bayesian_chi_squared(data, distribution_fun, params, test_type, censored = N
   params_list <- split(params, seq(NROW(params)))
 
 
-  if (test_type == "continuous"){
+  if (data_type == "continuous"){
     probabilities <- lapply(params_list, function(x){
 
-      paste(colnames(x), "=", x)
-
-      string <- paste("this_dist_fun( data, ", paste(paste(colnames(thisParams), "=", thisParams), collapse = ", "), ")")
-      eval(str2expression(string))
-
-      this_dist_fun(data, x )}
+      this_dist_fun(y, x )}
 
       )
   }
 
 
-  if (test_type == "discrete"){
+  if (data_type == "discrete"){
     probabilities <- lapply(params_list, function(x){
-      temp_df <- data.frame(probabilities_minus_1 = this_dist_fun(data - 1, x),
-                            probabilities = this_dist_fun(data, x))
+      temp_df <- data.frame(probabilities_minus_1 = this_dist_fun(y - 1, x),
+                            probabilities = this_dist_fun(y, x))
       probs <- temp_df %>% dplyr::mutate(g = apply(temp_df, 1, function(x) {runif(1, min = x["probabilities_minus_1"], max = x["probabilities"])} ))
 
       return(probs$g)
@@ -66,18 +77,18 @@ get_bayesian_chi_squared(data, distribution_fun, params, test_type, censored = N
   }
 
 
-  if (test_type == "censored"){
+  if (data_type == "censored"){
 
-    if (censored = NULL){
+    if (is.null(censored)){
       stop("If applying censored method a vector indicating which data points are censored is required")
     }
-    if (NROW(data) != NROW(censored)){
+    if (NROW(y) != NROW(censored)){
       stop("Length of censored vector be the same length as the data")
     }
 
     probabilities <- lapply(params_list, function(x){
       probs <- data.frame(
-        probabilities = this_dist_fun(data, x)
+        probabilities = this_dist_fun(y, x)
       )
 
       probs <- probs %>%
@@ -101,12 +112,9 @@ get_bayesian_chi_squared(data, distribution_fun, params, test_type, censored = N
 
   rb_list <- lapply(m_list, function(x) { sum(((x - n*p)^2)/(n*p)) })
 
-  r_b_new <- unlist(rb_list)
+  r_b <- unlist(rb_list)
 
-  return(r_b)
+  output <- sum(r_b > chi_val)/NROW(r_b) * 100
+  return(output)
 
 }
-
-sum(r_b > chi_val)/NROW(r_b) * 100
-sum(r_b_new > chi_val)/NROW(r_b) * 100
-

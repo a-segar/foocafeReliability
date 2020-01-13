@@ -92,7 +92,7 @@ for (jj in 1:NROW(r_b)) {
                           thisLambda)
     )
   
-  probs <- probs %>% dplyr::mutate(g = apply(probs, 1, function(x) {runif(1, min = x[1], max = x[2])} ))
+  probs <- dplyr::mutate(probs, g = apply(probs, 1, function(x) {runif(1, min = x[1], max = x[2])} ))
   
   
   for (ii in 1:length(m)){
@@ -106,6 +106,18 @@ for (jj in 1:NROW(r_b)) {
 sum(r_b > chi_val)/NROW(r_b) * 100
 
 ```
+
+```{R}
+
+params <- data.frame(lambda = rstan::extract(output)["lambda"])
+
+t <- bayesian_chi_squared_test(y = supercomputer_failures$failure_count,
+                               distribution_fun = ppois,
+                               params = params,
+                               data_type = "discrete")
+
+```
+
 
 ```{R}
 y <- supercomputer_failures$failure_count

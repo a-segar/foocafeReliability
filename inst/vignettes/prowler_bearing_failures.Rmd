@@ -178,6 +178,21 @@ sum(r_b2 > chi_val)/NROW(r_b2) * 100
 
 
 ```{R}
+params <- data.frame("meanlog" = rstan::extract(output)["mu"],
+                     "sdlog" = rstan::extract(output)["sigma"])
+colnames(params) <- c("meanlog","sdlog")
+
+bayesian_chi_squared_test(y = prowler_bearing_failures$operating_hours,
+                          distribution_fun = plnorm,
+                          params = params,
+                          data_type = "censored",
+                          censored = prowler_bearing_failures$right_censored)
+
+```
+
+
+
+```{R}
 
 get_inv_weibull_cdf <- function(shape, scale){
   output_fun <- function(U){
@@ -226,3 +241,6 @@ pp_check.foo <- function(object, ..., type = c("multiple", "overlaid")) {
 pp_check(x, type = "overlaid")
 
 ```
+
+
+Perhaps the best way to go is to calculate the pp check for the suspensions using the cdf and the failures using the pdf. So y_rep should be taken from the cdf to be compared with suspensions, and from the pdf to be compared with the failures.

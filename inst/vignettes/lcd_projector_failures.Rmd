@@ -65,18 +65,18 @@ lcd_exponential_output <- rstan::sampling(lcd_exponential_model, data = lcd_fail
 
 ```{R}
 
-stan_hist(output, c("lambda", "lambda_prior", "MTTF"))
+stan_hist(lcd_exponential_output, c("lambda", "lambda_prior", "MTTF"))
 
 ```
 
 
 ```{R}
 
-output_vals <- extract(output)
+lcd_exponential_output_vals <- extract(lcd_exponential_output)
 
-data <- data.frame(output_vals["lambda"],
-                   output_vals["lambda_prior"],
-                   output_vals["MTTF"])
+data <- data.frame(lcd_exponential_output_vals["lambda"],
+                   lcd_exponential_output_vals["lambda_prior"],
+                   lcd_exponential_output_vals["MTTF"])
 
 ggplot(data = data) +
   geom_density(aes(lambda)) +
@@ -92,7 +92,7 @@ ggplot(data = data) +
 ```{R}
 
 t = seq(1,3500,100)
-lambda_vals <- output_vals[["lambda"]]
+lambda_vals <- lcd_exponential_output_vals[["lambda"]]
 
 reliability <- data.frame(matrix(0,
                           nrow = NROW(t),
@@ -115,9 +115,9 @@ ggplot(data = reliability) +
 
 costTableList <- list()
 
-for (ii in 1:NROW(output_vals$lambda)){
+for (ii in 1:NROW(lcd_exponential_output_vals$lambda)){
 
-  thisLambda <- output_vals$lambda[ii]
+  thisLambda <- lcd_exponential_output_vals$lambda[ii]
   
   get_reliability <- function(thisLambda){
     f1 <- function(t){
@@ -161,14 +161,14 @@ K <- round(n^0.4)
 a <- seq(0,1,1/K)
 p <- diff(a)
 m <- numeric(K)
-output_vals <- rstan::extract(lcd_exponential_output)
+lcd_exponential_output_vals <- rstan::extract(lcd_exponential_output)
 
 chi_val <- qchisq(0.95,K-1)
-r_b <- numeric(NROW(output_vals$lambda))
+r_b <- numeric(NROW(lcd_exponential_output_vals$lambda))
 
 for (jj in 1:NROW(r_b)) {
   
-  thisLambda <- output_vals$lambda[jj]
+  thisLambda <- lcd_exponential_output_vals$lambda[jj]
   
   probabilities <- pexp(lcd_projector_failures$projection_hours, thisLambda)
   
@@ -189,7 +189,16 @@ sum(r_b > chi_val)/NROW(r_b) * 100
 
 ```
 
+```{R}
+params <- data.frame(rstan::extract(lcd_exponential_output)["lambda"])
+colnames(params) <- "rate"
 
+t <- bayesian_chi_squared_test(y = lcd_projector_failures$projection_hours,
+                               distribution_fun = pexp,
+                               params = params,
+                               data_type = "continuous")
+
+```
 
 ### Weibull fit:
 
