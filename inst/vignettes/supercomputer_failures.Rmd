@@ -1,5 +1,5 @@
 ---
-title: "supercomputer_failures"
+title: "Poisson model for supercomputer failure count data"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{supercomputer_failures}
@@ -21,8 +21,26 @@ library(foocafeReliability)
 library(rstan)
 ```
 
+(Example taken from p89 of Bayesian Reliability - Hamada et al.)
 
-## Build model
+Consider modelling the monthly number of failures at the Los Alamos National
+Laboratory Blue Mountain supercomputer components (shared memory processors or
+SMPs) by a Poisson distribution.
+
+```{R}
+
+?supercomputer_failures
+
+hist(supercomputer_failures$failure_count)
+
+```
+
+The supercomputer engineers expect that there should be no more than 10 failures
+for each component in the first month of operation. Ove way to represent this
+prior information is to assume a gamma prior distribution for lambda with a
+mean of five.
+
+# Build model
 ```{R}
 
 modelString <- "
