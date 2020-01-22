@@ -23,10 +23,12 @@
 #'
 #' @return The proportion of R^b values that exceed the specified critical value from
 #'  their known Chi-squared reference distribution.
+#'
 #' @export
 #'
+#' @importFrom magrittr %>%
+#' @importFrom Rcpp cpp_object_initializer
 #'
-
 
 bayesian_chi_squared_test <- function(y, distribution_fun, params, data_type = "continuous", censored = NULL, chisq_quantile = 0.95){
 

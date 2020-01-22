@@ -7,8 +7,6 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-## Basic stan model no suspensions but count data possion
-
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -23,24 +21,38 @@ library(rstan)
 
 (Example taken from p89 of Bayesian Reliability - Hamada et al.)
 
-Consider modelling the monthly number of failures at the Los Alamos National
-Laboratory Blue Mountain supercomputer components (shared memory processors or
-SMPs) by a Poisson distribution.
+
+## Consider data
 
 ```{R}
-
-?supercomputer_failures
 
 hist(supercomputer_failures$failure_count)
 
 ```
 
-The supercomputer engineers expect that there should be no more than 10 failures
-for each component in the first month of operation. Ove way to represent this
-prior information is to assume a gamma prior distribution for lambda with a
-mean of five.
+## Formulate model
 
-# Build model
+Consider modelling the monthly number of failures at the Los Alamos National
+Laboratory Blue Mountain supercomputer components (shared memory processors or
+SMPs) by a Poisson distribution.
+
+Let $ y_1,...,y_{47} $ denote the monthly number of failures recorded for the
+SMPs. With $ t_i = 1 $ month, we model the failure count data by the Poisson
+distribution as:
+
+$$
+Y_i ~ \textit{Poisson}(\lambda) = \textit{Poisson}(\lambda), i = 1,...,47
+$$
+
+where $\lambda$ is the mean monthly number of failures.
+
+# Model priors:
+The supercomputer engineers expect that there should be no more than 10 failures
+for each component in the first month of operation. One way to represent this
+prior information is to assume a gamma prior distribution for lambda with a
+mean of five. 
+
+## Build model using rstan
 ```{R}
 
 modelString <- "
@@ -84,47 +96,7 @@ output <- rstan::sampling(supercomputer_failures_model, data = supercomp_fail_li
 
 ```
 
-## Evaluate goodness of fit
-
-Note that the modified r_b for discrete data has been used
-```{R}
-
-n <- NROW(supercomputer_failures)
-K <- round(n^0.4)
-a <- seq(0,1,1/K)
-p <- diff(a)
-m <- numeric(K)
-output_vals <- rstan::extract(output)
-
-chi_val <- qchisq(0.95,K-1)
-r_b <- numeric(NROW(output_vals$lambda))
-
-for (jj in 1:NROW(r_b)) {
-  
-  thisLambda <- output_vals$lambda[jj]
-  
-  probs <- data.frame(
-    probabilities_minus_1 = ppois(supercomputer_failures$failure_count - 1,
-                                  thisLambda),
-    probabilities = ppois(supercomputer_failures$failure_count,
-                          thisLambda)
-    )
-  
-  probs <- dplyr::mutate(probs, g = apply(probs, 1, function(x) {runif(1, min = x[1], max = x[2])} ))
-  
-  
-  for (ii in 1:length(m)){
-    m[ii] <- sum(probs$g > a[ii] & probs$g < a[ii+1])
-  }
-  
-  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
-
-}
-
-sum(r_b > chi_val)/NROW(r_b) * 100
-
-```
-
+## Check the fit
 ```{R}
 
 params <- data.frame(lambda = rstan::extract(output)["lambda"])
@@ -133,81 +105,9 @@ t <- bayesian_chi_squared_test(y = supercomputer_failures$failure_count,
                                distribution_fun = ppois,
                                params = params,
                                data_type = "discrete")
+t
 
 ```
-
-
-```{R}
-y <- supercomputer_failures$failure_count
-stan_model_output <- output
-
-get_bayesian_chi_squared <- function(y, posterior_type, posterior_sample_params){
-  
-  # "poisson", thisParams
-  
-  
-}
-
-# Neccessary parameters need to be specified
-#   They then need to be given names according to the distribution they will
-#   be used with. 
-
-posterior_sample_params <- data.frame(lambda = rstan::extract(stan_model_output)["lambda"])
-
-posterior_sample_params <- data.frame(lambda = rstan::extract(stan_model_output)["lambda"],
-                     lambda2 = rstan::extract(stan_model_output)["lambda"])
-
-params <- data.frame("meanlog" = rstan::extract(output)["mu"],
-                     "sdlog" = rstan::extract(output)["sigma"])
-colnames(params) <- c("meanlog","sdlog")
-
-
-
-#function starts:
-
-n <- NROW(y)
-K <- round(n^0.4)
-a <- seq(0,1,1/K)
-p <- diff(a)
-m <- numeric(K)
-
-chi_val <- qchisq(0.95,K-1)
-r_b <- numeric(NROW(posterior_sample_params))
-
-for (jj in 1:NROW(r_b)) {
-  
-  this_dist_fun <- get_dist_fun("poisson", posterior_sample_params[jj,,drop = FALSE])
-  
-  
-  # Here you need to write the specific process needed for each of the three cases:
-  #   - Continuous
-  #   - Discrete
-  #   - Censored (right and left)
-  
-  
-  # Probabilities are calculated - these are specific to the case considered (here discrete)
-  probs <- data.frame(
-    probabilities_minus_1 = this_dist_fun(supercomputer_failures$failure_count[1] - 1),
-    
-    probabilities = this_dist_fun(supercomputer_failures$failure_count,
-                          thisLambda)
-    )
-  
-  probs <- probs %>% dplyr::mutate(g = apply(probs, 1, function(x) {runif(1, min = x[1], max = x[2])} ))
-  
-  
-  for (ii in 1:length(m)){
-    m[ii] <- sum(probs$g > a[ii] & probs$g < a[ii+1])
-  }
-  
-  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
-
-}
-
-sum(r_b > chi_val)/NROW(r_b) * 100
-
-```
-
 
 
 ## shinystan for model review:
@@ -222,17 +122,17 @@ p = Pr(T(simulations) > T(obs))
 
 ```{R}
 
+output_vals <- rstan::extract(output)
 y <- supercomputer_failures$failure_count
 y_rep <- rstan::extract(output, "y_rep")
 
 # Taking the mean to be the test statistic:
-ppp_mean <- sum(apply(output_vals$y_rep, 1, mean) > mean(y))/NROW(simulations_mean)
+ppp_mean <- sum(apply(output_vals$y_rep, 1, mean) > mean(y))/NROW(output_vals$y_rep)
 
 # Taking max to be the test statistic:
-ppp_maximum <- sum(apply(output_vals$y_rep, 1, max) > max(y))/NROW(simulations_mean)
+ppp_maximum <- sum(apply(output_vals$y_rep, 1, max) > max(y))/NROW(output_vals$y_rep)
 
 ```
-
 
 # Using bayesplot package with rstan output:
 https://mc-stan.org/bayesplot/index.html
@@ -245,9 +145,9 @@ pp_check.foo <- function(object, ..., type = c("multiple", "overlaid")) {
     y <- object[["y"]]
     yrep <- object[["yrep"]]
     switch(match.arg(type),
-           multiple = ppc_hist(y, yrep[1:min(8, nrow(yrep)),, drop = FALSE]),
-           overlaid = ppc_dens_overlay(y, yrep[1:100,, drop = FALSE]))
+           multiple = bayesplot::ppc_hist(y, yrep[1:min(8, nrow(yrep)),, drop = FALSE]),
+           overlaid = bayesplot::ppc_dens_overlay(y, yrep[1:100,, drop = FALSE]))
 }
-pp_check(x, type = "overlaid")
+bayesplot::pp_check(x, type = "overlaid")
 
 ```

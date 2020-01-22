@@ -132,7 +132,7 @@ lambda <- mean(expo$lambda)
 logn <- rstan::extract(lcd_lognormal_output)
 mu <- mean(logn$mu)
 sigma <- mean(logn$sigma)
-(weibull_BIC <- -2*log(prod(dlnorm(data, mu, sigma))) + log(NROW(data))*2)
+(lnorm_BIC <- -2*log(prod(dlnorm(data, mu, sigma))) + log(NROW(data))*2)
 
 
 ```

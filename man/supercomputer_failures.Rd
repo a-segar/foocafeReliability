@@ -15,7 +15,7 @@ supercomputer_failures
 A dataset containing the monthly number of failures of the Los Alamos
 National Laboratory Blue Mountain supercomputer components (shared memory
 processors or SMPs).  The supercomputer consists of 47 "identical" SMPs this
-dataset contains their montly number of failures for the first month of
+dataset contains their monthly number of failures for the first month of
 operation.
 }
 \keyword{datasets}

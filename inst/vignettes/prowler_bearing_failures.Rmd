@@ -128,56 +128,6 @@ ggplot(data = data, aes(t)) +
 
 ## Evaluate goodness of fit
 ```{R}
-
-n <- NROW(prowler_bearing_failures)
-K <- round(n^0.4)
-a <- seq(0,1,1/K)
-p <- diff(a)
-m <- numeric(K)
-m2 <- numeric(K)
-output_vals <- rstan::extract(output)
-
-chi_val <- qchisq(0.95,K-1)
-r_b <- numeric(NROW(output_vals$mu))
-r_b2 <- numeric(NROW(output_vals$mu))
-
-for (jj in 1:NROW(r_b)) {
-  
-  thisMu <- output_vals$mu[jj]
-  thisSigma <- sqrt(output_vals$sigma_2[jj])
-  
-  probs <- data.frame(
-    probabilities = plnorm(prowler_bearing_failures$operating_hours,
-                                  thisMu, thisSigma)
-    )
-  
-  probs <- probs %>%
-    dplyr::mutate(g = apply(probs, 1, function(x) {runif(1, min = x[1], max = 1)} )) %>% 
-    dplyr::mutate(censored = prowler_bearing_failures$right_censored) %>% 
-    dplyr::mutate(test = ifelse(censored == TRUE, g, probabilities))
-  
-  for (ii in 1:length(m)){
-    m[ii] <- sum(probs$test > a[ii] & probs$test < a[ii+1])
-    m2[ii] <- sum(probs$probabilities > a[ii] & probs$probabilities < a[ii+1])
-  }
-  
-  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
-  r_b2[jj] <- sum(((m2 - n*p)^2)/(n*p))
-
-}
-
-```
-
-
-```{R}
-
-sum(r_b > chi_val)/NROW(r_b) * 100
-sum(r_b2 > chi_val)/NROW(r_b2) * 100
-
-```
-
-
-```{R}
 params <- data.frame("meanlog" = rstan::extract(output)["mu"],
                      "sdlog" = rstan::extract(output)["sigma"])
 colnames(params) <- c("meanlog","sdlog")
@@ -190,17 +140,6 @@ bayesian_chi_squared_test(y = prowler_bearing_failures$operating_hours,
 
 ```
 
-
-
-```{R}
-
-get_inv_weibull_cdf <- function(shape, scale){
-  output_fun <- function(U){
-    ((-log(1 - U))^(-shape))*scale
-  }
-  return(output_fun)
-}
-```
 
 
 ```{R}

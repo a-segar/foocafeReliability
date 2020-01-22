@@ -20,10 +20,15 @@ Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.0.2
-Depends: R (>= 3.6.0)
+Depends: 
+    R (>= 3.6.0),
+    magrittr,
+    Rcpp
 Imports: 
     dplyr,
-    shiny
+    shiny,
+    magrittr,
+    rstan
 Suggests: 
     testthat,
     knitr,

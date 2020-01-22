@@ -5,6 +5,8 @@
 Nweeks <- 50000
 current <- 10
 position <- numeric(Nweeks)
+p <- list()
+jj = 1
 
 for (ii in 1:Nweeks){
   position[ii] <- current
@@ -15,7 +17,17 @@ for (ii in 1:Nweeks){
 
   current <- ifelse(runif(1) < proposal/current, proposal, current)
 
+  if ((ii %% 1000) == 0){
+    p[[jj]] <- hist(position, breaks = (0:11) - 0.5)
+    jj = jj + 1
+  }
+
 }
+
+for (jj in 1:NROW(p)){
+  plot(p[[jj]])
+  Sys.sleep(0.05)
+  }
 
 hist(position, breaks = (0:11) - 0.5)
 
