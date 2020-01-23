@@ -26,7 +26,7 @@
 #'  a large private university placed identical lamps in three projector models
 #'  for a total of 31 projectors. The university staff recorded the number of
 #'  projection hours (as measured by the projector) when each lamp burned out.
-#'  This dataset are the results from that experiment.
+#'  This dataset is the results from that experiment.
 #'
 #' @format
 #' \describe{A data frame with 31 rows and two columns

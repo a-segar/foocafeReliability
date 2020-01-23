@@ -23,6 +23,16 @@ library(rstan)
 ```
 
 
+Consider the LCD projector failures data considered in the continuous data example:
+
+```{R, include = FALSE}
+
+?lcd_projector_failures
+
+```
+
+
+
 ```{R}
 data <- rweibull(n = 25, shape = 2, scale = 4)
 
@@ -92,7 +102,6 @@ exponential_output <- rstan::sampling(exponential_model, data = data_list, chain
 ```{R}
 
 stan_hist(weibull_output)
-
 stan_hist(exponential_output)
 
 ```

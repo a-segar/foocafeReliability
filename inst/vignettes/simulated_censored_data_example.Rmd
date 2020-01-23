@@ -1,0 +1,274 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup}
+library(foocafeReliability)
+library(rstan)
+```
+
+
+## Build model
+```{R}
+
+modelString <- "
+  data {
+    int<lower=0> Nobs;
+    int<lower=0> Ncen;
+    real<lower=0> yobs[Nobs];
+    real<lower=0> ycen[Ncen];
+  }
+
+  parameters {
+    real<lower=0> shape;
+    real<lower=0> scale;
+  }
+
+  model {
+  
+    target += weibull_lpdf(yobs | shape, scale);
+    target += weibull_lccdf(ycen | shape, scale);
+
+    shape ~ uniform(0,10);
+    scale ~ gamma(3, 0.06);
+  }
+  
+  generated quantities {
+  
+    //sample predicted values from the model for posterior predictive checks
+    real y_rep[Nobs+Ncen];
+    
+    for(n in 1:(Nobs+Ncen))
+      y_rep[n] = weibull_rng(shape, scale);
+  }
+"
+
+censored_model <- rstan::stan_model(model_code = modelString)
+
+
+```
+
+#
+```{R}
+fail_times <- rweibull(100,3,100)
+
+temp_fail_times <- fail_times
+t <- numeric(length(fail_times))
+
+for (ii in 1:NROW(fail_times)){
+  
+  t[ii] <- min(temp_fail_times)
+  
+  temp_fail_times <- temp_fail_times[-which(temp_fail_times <= min(temp_fail_times))]
+
+}
+```
+
+```{R}
+
+t <- as.list(t[seq(1,100,9)])
+
+censored_list <- lapply(t, function(x) {
+  
+  censored_idx <- fail_times >= x
+  
+  temp <- fail_times
+  temp[censored_idx] <-  x
+  
+  df <- data.frame(times = temp,
+                   censored = censored_idx)
+  
+  return(df)
+  
+  })
+
+```
+
+
+```{R}
+
+model_fits <- lapply(censored_list, function(x) {
+  
+  failures <- x[x$censored == FALSE, "times"] %>% as.array()
+  suspensions <- x[x$censored == TRUE, "times"] %>% as.array()
+  
+  fail_list <- list(Nobs = NROW(failures),
+                              Ncen = NROW(suspensions),
+                              yobs = failures,
+                              ycen = suspensions
+                            )
+  
+  output <- rstan::sampling(censored_model, data = fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+  
+})
+
+```
+
+
+## Evaluate goodness of fit
+```{R}
+
+chi_sq <- numeric(length(censored_list))
+
+for (jj in 1:length(censored_list)){
+  
+  print(jj)
+  
+  idx <- jj #length(censored_list)
+  (sum(censored_list[[idx]]$censored)/NROW(censored_list[[idx]]))
+  
+  shape <- rstan::extract(model_fits[[idx]])["shape"]$shape %>% as.numeric()
+  scale <- rstan::extract(model_fits[[idx]])["scale"]$scale %>% as.numeric()
+  
+  params <- data.frame("shape" = shape,
+                       "scale" = scale)
+  
+  chi_sq[jj] <- bayesian_chi_squared_test(y = censored_list[[idx]]$times,
+                            distribution_fun = pweibull,
+                            params = params,
+                            data_type = "censored",
+                            censored = censored_list[[idx]]$censored)
+}
+
+```
+
+
+
+```{R}
+shape_1 <- rstan::extract(model_fits[[1]])[["shape"]]
+shape_2 <- rstan::extract(model_fits[[2]])[["shape"]]
+shape_3 <- rstan::extract(model_fits[[3]])[["shape"]]
+shape_4 <- rstan::extract(model_fits[[4]])[["shape"]]
+shape_5 <- rstan::extract(model_fits[[5]])[["shape"]]
+shape_6 <- rstan::extract(model_fits[[6]])[["shape"]]
+shape_7 <- rstan::extract(model_fits[[7]])[["shape"]]
+shape_8 <- rstan::extract(model_fits[[8]])[["shape"]]
+shape_9 <- rstan::extract(model_fits[[9]])[["shape"]]
+shape_10 <- rstan::extract(model_fits[[10]])[["shape"]]
+shape_11 <- rstan::extract(model_fits[[11]])[["shape"]]
+shape_12 <- rstan::extract(model_fits[[12]])[["shape"]]
+
+shape <- data.frame(shape_1 = shape_1,
+                 shape_2 = shape_2,
+                 shape_3 = shape_3,
+                 shape_4 = shape_4,
+                 shape_5 = shape_5,
+                 shape_6 = shape_6,
+                 shape_7 = shape_7,
+                 shape_8 = shape_8,
+                 shape_9 = shape_9,
+                 shape_10 = shape_10,
+                 shape_11 = shape_11,
+                 shape_12 = shape_12)
+
+ggplot(data = shape) +
+  geom_density(aes(shape_1)) +
+  geom_density(aes(shape_2)) +
+  geom_density(aes(shape_3)) +
+  geom_density(aes(shape_4)) +
+  geom_density(aes(shape_5)) +
+  geom_density(aes(shape_6)) +
+  geom_density(aes(shape_7)) +
+  geom_density(aes(shape_8)) +
+  geom_density(aes(shape_9)) +
+  geom_density(aes(shape_10)) +
+  geom_density(aes(shape_11)) +
+  geom_density(aes(shape_12))
+
+```
+
+
+```{R}
+scale_1 <- rstan::extract(model_fits[[1]])[["scale"]]
+scale_2 <- rstan::extract(model_fits[[2]])[["scale"]]
+scale_3 <- rstan::extract(model_fits[[3]])[["scale"]]
+scale_4 <- rstan::extract(model_fits[[4]])[["scale"]]
+scale_5 <- rstan::extract(model_fits[[5]])[["scale"]]
+scale_6 <- rstan::extract(model_fits[[6]])[["scale"]]
+scale_7 <- rstan::extract(model_fits[[7]])[["scale"]]
+scale_8 <- rstan::extract(model_fits[[8]])[["scale"]]
+scale_9 <- rstan::extract(model_fits[[9]])[["scale"]]
+scale_10 <- rstan::extract(model_fits[[10]])[["scale"]]
+scale_11 <- rstan::extract(model_fits[[11]])[["scale"]]
+scale_12 <- rstan::extract(model_fits[[12]])[["scale"]]
+
+scale <- data.frame(scale_1 = scale_1,
+                 scale_2 = scale_2,
+                 scale_3 = scale_3,
+                 scale_4 = scale_4,
+                 scale_5 = scale_5,
+                 scale_6 = scale_6,
+                 scale_7 = scale_7,
+                 scale_8 = scale_8,
+                 scale_9 = scale_9,
+                 scale_10 = scale_10,
+                 scale_11 = scale_11,
+                 scale_12 = scale_12)
+
+ggplot(data = scale) +
+  geom_density(aes(scale_1)) +
+  geom_density(aes(scale_2)) +
+  geom_density(aes(scale_3)) +
+  geom_density(aes(scale_4)) +
+  geom_density(aes(scale_5)) +
+  geom_density(aes(scale_6)) +
+  geom_density(aes(scale_7)) +
+  geom_density(aes(scale_8)) +
+  geom_density(aes(scale_9)) +
+  geom_density(aes(scale_10)) +
+  geom_density(aes(scale_11)) +
+  geom_density(aes(scale_12))
+```
+
+
+
+```{R}
+
+idx <- 12
+y_rep <- rstan::extract(model_fits[[idx]], "y_rep")
+
+actual_mean <- mean(censored_list[[idx]]$times)
+y_rep_mean <- apply(y_rep$y_rep, 2, mean)
+
+
+```
+
+
+
+```{R}
+idx <- 12
+output_vals <- rstan::extract(model_fits[[idx]], c("mu", "sigma"))
+y = censored_list[[idx]]$times
+censored_data <- y[censored_list[[idx]]$censored == TRUE]
+
+generated_y <- numeric(NROW(censored_data))
+
+for (ii in 1:NROW(censored_data)){
+  this_U = runif(1, plnorm(censored_data[ii],output_vals$mu[jj], output_vals$sigma[jj]), 1)
+  generated_y[ii] <- as.numeric(quantile(rlnorm(100000, output_vals$mu[jj], output_vals$sigma[jj]), this_U))
+}
+
+y_new <- y
+y_new[prowler_bearing_failures$right_censored == TRUE] <- generated_y
+
+```
+
+
+```{R}
+library(bayesplot)
+
+x <- list(y = y_new,
+          yrep = rstan::extract(output, "y_rep")$y_rep)
+class(x) <- "foo"
+pp_check.foo <- function(object, ..., type = c("multiple", "overlaid")) {
+    y <- object[["y"]]
+    yrep <- object[["yrep"]]
+    switch(match.arg(type),
+           multiple = ppc_hist(y, yrep[1:min(8, nrow(yrep)),, drop = FALSE]),
+           overlaid = ppc_dens_overlay(y, yrep[1:100,, drop = FALSE]))
+}
+pp_check(x, type = "overlaid")
+
+```
+

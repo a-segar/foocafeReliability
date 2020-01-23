@@ -1,8 +1,10 @@
 ---
-title: "Uber"
-author: "Andrew Segar"
-date: '2020-01-02'
-output: html_document
+title: "Uber censored data example"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{uber_censored_data_example}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
@@ -13,12 +15,11 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-#library(foocafeReliability)
 library(rstan)
 library(ggplot2)
 ```
 
-## Generate data
+# Generate data
 ```{R}
 
 n = 5000
@@ -33,9 +34,9 @@ data <- data.frame(x = numeric(n),
 
 data["x"] <- rnorm(n, 0, 0.34)
 
-link <- log(1+exp(a*data$x+b))
+link <- 1/log(1+exp(a*data$x+b))
 
-data["y"] <- rexp(n, rate = 1/link)
+data["y"] <- rexp(n, rate = link)
 
 data["observed"] <- data$y < c
 
@@ -50,7 +51,13 @@ ggplot(data = data) +
 
 ```
 
-Fit model to data
+For info on fitting model to censored data see:
+
+https://stackoverflow.com/questions/40289457/stan-using-target-syntax
+
+Hamada p108 - explaination of censored data modelling
+
+
 ```{R}
 
 modelString = "
@@ -91,7 +98,7 @@ uber_model <- rstan::stan_model(model_code = modelString)
 
 x_obs <- data[data$observed == TRUE,"x"]
 x_cen <- data[data$observed == FALSE,"x"]
-y_obs <- data[data$observed == TRUE,"y"]
+y_obs <- data[data$observed == TRUE,"y_obs"]
 y_cen <- data[data$observed == FALSE,"y_obs"]
 
 
@@ -111,6 +118,11 @@ stan_data_list <- list (Nobs = NROW(x_obs),
 
 output <- rstan::sampling(uber_model, data = stan_data_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
+```
+
+
+Plot histograms of posteriors for parameters a and b.
+```{R}
 stan_hist(output, c("model_a", "model_b"))
 ```
 

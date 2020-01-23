@@ -30,11 +30,11 @@ determine the bearing failure time distribution when they use the bearings with
 O-64-2, by removing the tester effect. In analysing these data, we can account 
 for the tester-to-tester differences by specifying
 
-Y ~ Weibull(alpha_i, beta)
+$$ Y \sim Weibull(\alpha_i, \beta) $$
 
-where y_ij is the jth observed failure time from the i-th tester. Note that this
+where $y_{ij}$ is the $j-th$ observed failure time from the $i-th$ tester. Note that this
 model specification used the first parametrisation of the Weibull distribution 
-given in Appendix B. Further, we model the logged scale parameter alpha_i by:
+given in Appendix B. Further, we model the logged scale parameter $\alpha_i$ by:
 
 
 ```{R}

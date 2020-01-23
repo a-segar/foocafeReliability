@@ -1,5 +1,7 @@
 # foocafeReliability
 
+Books:
+Hamada, Michael S., et al. Bayesian reliability. Springer Science & Business Media, 2008.
 
 # Useful links:
 

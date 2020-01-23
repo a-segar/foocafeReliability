@@ -41,7 +41,7 @@ SMPs. With $ t_i = 1 $ month, we model the failure count data by the Poisson
 distribution as:
 
 $$
-Y_i ~ \textit{Poisson}(\lambda) = \textit{Poisson}(\lambda), i = 1,...,47
+Y_i \sim \textit{Poisson}(\lambda) = \textit{Poisson}(\lambda), i = 1,...,47
 $$
 
 where $\lambda$ is the mean monthly number of failures.
