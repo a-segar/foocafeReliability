@@ -103,10 +103,6 @@ library(shiny)
 library(rstan)
 library(Rcpp)
 
-# stan_exponential_model <- readRDS("~/Desktop/foocafeReliability/stan_exponential_model.RDS")
-# stan_models <- list()
-# stan_models[["exponential"]] <- stan_exponential_model
-
 stan_models <- readRDS("stan_models.RDS")
 
 modelStr <- list()
@@ -297,6 +293,11 @@ server <- shiny::shinyServer(function(input, output, session) {
 
 
     } else if (tolower(input$model) == "custom"){
+
+      # param_names <- names(output)[substr(names(output), 1, 5) != "y_rep" &
+      #                                    substr(names(output), 1, 5) != "lp__"]
+      #
+      # rstan::extract(stanModel())[param_names]
 
       t <- "not available for custom models"
 

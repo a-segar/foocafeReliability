@@ -21,6 +21,9 @@ library(rstan)
 
 
 ## Build model  Censored Data Example Ex 4.6 from Bayesian Reliabilty
+
+See https://mc-stan.org/docs/2_21/stan-users-guide-2_21.pdf p70 for STAN
+censored data documentation
 ```{R}
 
 modelString <- "

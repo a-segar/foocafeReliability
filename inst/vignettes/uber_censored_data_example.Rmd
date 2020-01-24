@@ -22,7 +22,7 @@ library(ggplot2)
 # Generate data
 ```{R}
 
-n = 5000
+n = 50000
 a = 2
 b = 4
 c = 8

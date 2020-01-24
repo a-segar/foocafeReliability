@@ -22,15 +22,19 @@ library(rstan)
 (Example taken from p89 of Bayesian Reliability - Hamada et al.)
 
 
-## Consider data
+# Consider data
 
 ```{R}
 
-hist(supercomputer_failures$failure_count)
+supercomputer_failures %>%
+  ggplot(aes(x = failure_count)) +
+  geom_histogram(fill = "turquoise", binwidth = 1) +
+  labs(x = "Number of failures in first month of operating", y = "Count")
+
 
 ```
 
-## Formulate model
+# Formulate model
 
 Consider modelling the monthly number of failures at the Los Alamos National
 Laboratory Blue Mountain supercomputer components (shared memory processors or
@@ -52,7 +56,7 @@ for each component in the first month of operation. One way to represent this
 prior information is to assume a gamma prior distribution for lambda with a
 mean of five. 
 
-## Build model using rstan
+# Build model using rstan
 ```{R}
 
 modelString <- "
@@ -85,7 +89,7 @@ supercomputer_failures_model <- rstan::stan_model(model_code = modelString)
 
 ```
 
-## Fit model to data
+# Fit model to data
 ```{R}
 
 supercomp_fail_list <- list(Nobs = NROW(supercomputer_failures$failure_count),
@@ -96,29 +100,37 @@ output <- rstan::sampling(supercomputer_failures_model, data = supercomp_fail_li
 
 ```
 
-## Check the fit
+# Check the fit
 ```{R}
 
 params <- data.frame(lambda = rstan::extract(output)["lambda"])
 
-t <- bayesian_chi_squared_test(y = supercomputer_failures$failure_count,
+bayesian_chi_squared_test(y = supercomputer_failures$failure_count,
                                distribution_fun = ppois,
                                params = params,
                                data_type = "discrete")
-t
 
 ```
 
 
-## shinystan for model review:
-```{R}
-y <- supercomputer_failures$failure_count
-shinystan::launch_shinystan(output)
+# Evaluate goodness of fit using posterior predictive checks
 
-```
-## Evaluate goodness of fit using posterior predictive checks
-
+Posterior predictive checks are made by simulating data from the proposed model,
+then comparing a chosen test statistic (this can be the mean, maximum value,
+minimum value or whatever you choose) from those simulations to the test
+statistic for the actual data. If the model fits the data well we would expect
+the test statistic for the simulations to be close to that of the real data.
+Letting $T$ be the chosen test statistic, we can write
+$$
 p = Pr(T(simulations) > T(obs))
+$$
+where $simulations$ is the set of simulated data, and $obs$ is the actual data.
+This is known as the posterior predictive p-value and the closer it lies to the
+value $0.5$, the more closely test statistic for our simulations matches that of
+the real data.
+For example, considering the exponential model we fitted above, we can take
+the mean as our test statistic, and calculate the posterior predictive p-value
+as follows.
 
 ```{R}
 
@@ -127,11 +139,11 @@ y <- supercomputer_failures$failure_count
 y_rep <- rstan::extract(output, "y_rep")
 
 # Taking the mean to be the test statistic:
-ppp_mean <- sum(apply(output_vals$y_rep, 1, mean) > mean(y))/NROW(output_vals$y_rep)
-
+(ppp_mean <- sum(apply(output_vals$y_rep, 1, mean) > mean(y))/NROW(output_vals$y_rep)
+)
 # Taking max to be the test statistic:
-ppp_maximum <- sum(apply(output_vals$y_rep, 1, max) > max(y))/NROW(output_vals$y_rep)
-
+(ppp_maximum <- sum(apply(output_vals$y_rep, 1, max) > max(y))/NROW(output_vals$y_rep)
+)
 ```
 
 # Using bayesplot package with rstan output:
@@ -149,5 +161,12 @@ pp_check.foo <- function(object, ..., type = c("multiple", "overlaid")) {
            overlaid = bayesplot::ppc_dens_overlay(y, yrep[1:100,, drop = FALSE]))
 }
 bayesplot::pp_check(x, type = "overlaid")
+
+```
+
+## shinystan for model review:
+```{R}
+y <- supercomputer_failures$failure_count
+shinystan::launch_shinystan(output)
 
 ```

@@ -19,8 +19,7 @@ library(foocafeReliability)
 library(rstan)
 ```
 
-
-## Build model  (based on example 4.3 from Bayesian Reliability)
+(based on example 4.3 from Bayesian Reliability)
 
 Failure time data is commonly used to assess component reliability. This is a
 record of the continuous time until a component failed. In general failure time
@@ -61,6 +60,8 @@ for alpha and beta; $\alpha \approx 2.5$ and $\beta \approx 2350$.
 We now build the model using the rstan package. Lambda is the key parameter in
 this model. MTTF is simply a transformation of lambda. The variable
 'lambda_prior' is defined in order to the posterior for lambda later on.
+
+# Build model
 
 ```{R}
 
