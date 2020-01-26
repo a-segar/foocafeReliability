@@ -19,6 +19,17 @@ library(rstan)
 library(ggplot2)
 ```
 
+
+In this example, Uber shows how they model the time when a promotion begins and a customer takes a second ride.  The challenge to not bias data is that the promotion or that promotions monitoring can end at a hard deadline, and no longer monitored (say 30 days).  They are trying to model a response variable time to second ride within a promotion period.   When the 30 days end the promotion, a number of customers will have not appeared for a second ride.  However, that is not to mean they will not ever take a second ride, in fact, with Probabilistic AI, they can model these right-censored data also known as suspensions without discrimination integrated into a linear model.  
+
+Probabilistic AI programming, in this author's opinion, appears to flip the way to approach modelling.  Classical statistics teaches one direction, bayesian modelling with probAI appears to mix it up.  At the end of the day, it's all about the MCMC generation of a posterior samples and inspection of the posterior distribition.   The following text does a real good example a linear model.   Linear model with right-censored data.  
+
+McElreath, Richard. Statistical rethinking: A Bayesian course with examples in R and Stan. Chapman and Hall/CRC, 2018.
+
+In the uber example they want to see how variables a and b, in a linear relationship "can be sampled from a posterior".   We even sample the input varibles too, just like linear regresion.   For more details on the example:
+
+https://eng.uber.com/modeling-censored-time-to-event-data-using-pyro/
+
 # Generate data
 ```{R}
 
