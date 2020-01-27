@@ -1,4 +1,5 @@
 
+
 lcd_projector_failures <- tibble::tibble(
   lcd_model = c(1,1,1,1,1,2,2,2,1,2,1,3,3,2,2,3,
                 3,2,1,2,1,3,1,2,1,2,1,1,2,2,2),
@@ -103,10 +104,9 @@ library(shiny)
 library(rstan)
 library(Rcpp)
 library(ggplot2)
+library(magrittr)
 
-#stan_models <- readRDS("stan_models.RDS")
-#readRDS("C:/Users/Andrew/Desktop/foocafeReliability/inst/lcd_projectors_app (shinyapps.io)/stan_models.RDS")
-
+stan_models <- readRDS("stan_models.RDS")
 
 modelStr <- list()
 modelStr[["exponential"]] <- "
@@ -443,6 +443,9 @@ server <- shiny::shinyServer(function(input, output, session) {
   })
 
   output$ppp_plot <- renderPlot({
+    model_output <- stanModel()
+    y <- lcd_projector_failures$projection_hours
+    output_vals <- rstan::extract(model_output)
 
     if (input$ppp_test_statistic == "custom"){
       test_stat <- input$custom_ppp_test_statistic
