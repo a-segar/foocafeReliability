@@ -1,13 +1,14 @@
 ---
-title: "lubricant_bearings_failures"
-output: rmarkdown::html_vignette
+title: "model selection"
+output:
+  html_document:
+    code_folding: hide
+  
 vignette: >
   %\VignetteIndexEntry{model_selection}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
-
-## Page 116 
 
 
 ```{r, include = FALSE}
@@ -25,19 +26,19 @@ library(rstan)
 
 Consider the LCD projector failures data considered in the continuous data example:
 
-```{R, include = FALSE}
+```{R, include = FALSE, eval = FALSE}
 
 ?lcd_projector_failures
 
 ```
 
-
-
+We generate data from a Weibull distribution
 ```{R}
 data <- rweibull(n = 25, shape = 2, scale = 4)
 
 ```
 
+Then fit a Weibull model to the data
 ```{R}
 
 modelString = "
@@ -69,7 +70,7 @@ weibull_output <- rstan::sampling(weibull_model, data = data_list, chains = 4, i
 
 ```
 
-
+Then we fit an exponential model
 ```{R}
 
 modelString = "
@@ -106,7 +107,7 @@ stan_hist(exponential_output)
 
 ```
 
-
+As expected, the BIC is lower for the 
 ```{R}
 
 weib <- rstan::extract(weibull_output)
@@ -121,27 +122,3 @@ exponential_BIC <- -2*log(prod(dexp(data, lambda))) + log(NROW(data))*1
 
 ```
 
-
-
-# Comparison between exponential, weibull, and lognormal fits to 
-# lcd_projector_failures data
-(note that lcd_projector_failures vignette needs to be run first)
-
-```{R}
-
-weib <- rstan::extract(lcd_weibull_output)
-shape <- mean(weib$shape)
-scale <- mean(weib$scale)
-(weibull_BIC <- -2*log(prod(dweibull(data, shape, scale))) + log(NROW(data))*2)
-
-expo <- rstan::extract(lcd_exponential_output)
-lambda <- mean(expo$lambda)
-(exponential_BIC <- -2*log(prod(dexp(data, lambda))) + log(NROW(data))*1)
-
-logn <- rstan::extract(lcd_lognormal_output)
-mu <- mean(logn$mu)
-sigma <- mean(logn$sigma)
-(lnorm_BIC <- -2*log(prod(dlnorm(data, mu, sigma))) + log(NROW(data))*2)
-
-
-```
