@@ -1,4 +1,4 @@
-# foocafeReliability
+﻿# foocafeReliability
 
 Tools and examples for use in the time-to-event analytics sessions at Foocafe in
 Malmö.
@@ -27,7 +27,7 @@ in Malmö and modifications will be made before that takes place.
 
 ## Resources used
 
-Hamada, Michael S., et al. Bayesian reliability. Springer Science & Business Media, 2008.
+Hamada, Michael S., et al. Bayesian Reliability. Springer Science & Business Media, 2008.
 
 Another example comes from the article 'Modelling Cesored
 Time-to-Event Data Using Pyro, an Open Source Probabilistic Programming
