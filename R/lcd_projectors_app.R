@@ -9,7 +9,7 @@
 
 lcd_projectors_app <- function() {
 
-  appDir <- system.file("lcd_projectors_app", package = "foocafeReliability")
+  appDir <- system.file("shiny_apps/lcd_projectors_app", package = "foocafeReliability")
   if (appDir == "") {
     stop("Could not find example directory. Try re-installing `foocafeReliability`.", call. = FALSE)
   }

@@ -1,10 +1,8 @@
 ---
 title: "Poisson model for supercomputer failure count data"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{supercomputer_failures}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+output:
+  html_document:
+    code_folding: hide
 ---
 
 ```{r, include = FALSE}
@@ -14,7 +12,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r setup}
+```{r setup, include = FALSE}
 library(foocafeReliability)
 library(rstan)
 ```
@@ -164,8 +162,9 @@ bayesplot::pp_check(x, type = "overlaid")
 
 ```
 
-## shinystan for model review:
-```{R}
+# shinystan for model review:
+```{R, eval = FALSE}
+
 y <- supercomputer_failures$failure_count
 shinystan::launch_shinystan(output)
 

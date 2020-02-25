@@ -22,8 +22,19 @@ library(rstan)
 
 ## Build model  Censored Data Example Ex 4.6 from Bayesian Reliabilty
 
+
+In this example, the consideration of censored data or suspensions comes into play.   Although it need not have a bayesian approach, it is nevertheless encouraged to use Bayesian because ProbAI provides a common framework for the several types of censored data that may emerge.  Here is an example using right-censored data.
+
+
+For more information on modeling censored data with Stan:
 See https://mc-stan.org/docs/2_21/stan-users-guide-2_21.pdf p70 for STAN
 censored data documentation
+
+Please observe that in this example the failure and censored data is proposed to best fit a lognormal distribution.   Lognormal parameters are mu and sigma.  Mu has a normal prior and sigma has an Inverse Gamma Prior.   Note that this may sound abstract, but these distribution are called "conjugate" priors and make the best natural fit to the parameter uncertainty.   The choices also reflect an engineering knowledge that is captured in the distribution.   We have an inverse gamma with parameters 6.5, 23.5.  This was generated with engineering input to the mean and uncertainty of this distribution parameterized to the preferred conjugate distribution.  Using conjugates can speed of MCMC.   
+
+Priors can seem intimidating, but do not put to focus on it.  Just observe the mean and uncertainty reflected in the prior.   The prior could have be a straight line (a completely uninformed prior) or a triangle shape with discontinuties.  It need not be a distribution, but it can make the computation smoother.  
+
+
 ```{R}
 
 modelString <- "
@@ -69,6 +80,10 @@ prowler_bearing_failures_model <- rstan::stan_model(model_code = modelString)
 
 ```
 
+
+
+
+
 ## Fit model to data
 ```{R}
 failures <- prowler_bearing_failures$operating_hours[prowler_bearing_failures$right_censored == FALSE]
@@ -83,6 +98,11 @@ prowler_bearing_fail_list <- list(Nobs = NROW(failures),
 output <- rstan::sampling(prowler_bearing_failures_model, data = prowler_bearing_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
 ```
+
+# Interpretation.   
+
+The posterior medians at each time is plotted with the uncertainty.   Since the interest is to ask for a prediction of a the survival probability at a time t in the future.   
+
 
 ```{R}
 
@@ -123,10 +143,15 @@ data <- data.frame(t = t,
 
 ggplot(data = data, aes(t)) +
   geom_line(aes(y = meanVal)) +
-  geom_ribbon(aes(ymin = LQ, ymax = UQ), alpha = 0.05)
+  geom_ribbon(aes(ymin = LQ, ymax = UQ), alpha = 0.05) + ylab("R(t) prob of survival time t
+                                                          ")
   
 
 ```
+
+The next step is goodness of fit.  There is a chi-square test for this.   7.5375% of this statistic exceed the .95 quartile which suggests the lognormal is a good fit.  For more information on chi-square test, please review the text:
+
+Hamada, Michael S., et al., Bayesian reliability. Springer Science & Business Media, 2008.
 
 
 # Evaluate goodness of fit

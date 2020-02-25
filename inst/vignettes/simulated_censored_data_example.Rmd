@@ -271,4 +271,3 @@ pp_check.foo <- function(object, ..., type = c("multiple", "overlaid")) {
 pp_check(x, type = "overlaid")
 
 ```
-

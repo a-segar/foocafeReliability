@@ -1,6 +1,8 @@
 ---
 title: "Continuous data example"
-output: rmarkdown::html_vignette
+output:
+  html_document:
+    code_folding: hide
 vignette: >
   %\VignetteIndexEntry{continuous_data_example}
   %\VignetteEngine{knitr::rmarkdown}
@@ -14,7 +16,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r setup}
+```{r setup, class.source='fold-show'}
 library(foocafeReliability)
 library(rstan)
 ```
@@ -63,7 +65,7 @@ this model. MTTF is simply a transformation of lambda. The variable
 
 # Build model
 
-```{R}
+```{R, class.source='fold-show'}
 
 modelString <- "
   data {
@@ -97,7 +99,7 @@ lcd_exponential_model <- rstan::stan_model(model_code = modelString)
 ```
 
 Then we fit the model to the LCD failures data.
-```{R}
+```{R, class.source='fold-show'}
 
 lcd_fail_list <- list(Nobs = NROW(lcd_projector_failures$projection_hours),
                           projection_hours = lcd_projector_failures$projection_hours
@@ -108,14 +110,15 @@ lcd_exponential_output <- rstan::sampling(lcd_exponential_model, data = lcd_fail
 ```
 
 The posterior distributions can be displayed using stan_hist
-```{R}
+```{R, class.source='fold-show'}
 
 stan_hist(lcd_exponential_output, c("lambda", "lambda_prior", "MTTF"))
 
 ```
+
 Comparing the prior (dashed line) with the posterior (solid line)
 
-```{R}
+```{R, class.source='fold-show'}
 
 lcd_exponential_output_vals <- extract(lcd_exponential_output)
 
@@ -129,39 +132,16 @@ ggplot(data = data) +
 ```
 
 
-
-```{R}
+```{R, class.source='fold-show'}
 ggplot(data = data) +
   geom_density(aes(MTTF))
 
 ```
 
 
-```{R}
+```{R, class.source='fold-show'}
 
-t = seq(1,3500,100)
-lambda_vals <- lcd_exponential_output_vals[["lambda"]]
-
-reliability <- data.frame(matrix(0,
-                          nrow = NROW(t),
-                          ncol = NROW(lambda_vals)))
-
-for (ii in 1:NROW(reliability)) {
-  print(ii)
-  reliability[ii,] = exp(-lambda_vals * t[ii])
-}
-
-ggplot(data = reliability) +
-  geom_density(aes(lambda)) +
-  geom_density(aes(lambda_prior), linetype = "dashed")
-
-
-```
-
-
-```{R}
-
-costTableList <- list()
+reliabilityList <- list()
 
 for (ii in 1:NROW(lcd_exponential_output_vals$lambda)){
 
@@ -176,15 +156,15 @@ for (ii in 1:NROW(lcd_exponential_output_vals$lambda)){
 
   reliability <- get_reliability(thisLambda)
 
-  costTable <- data.frame("t" = t,
+  reliabilityDF <- data.frame("t" = t,
                           "reliability" = numeric(NROW(t)))
 
-  costTable$reliability <- reliability(t)
+  reliabilityDF$reliability <- reliability(t)
   
-  costTableList[[ii]] <- costTable
+  reliabilityList[[ii]] <- reliabilityDF
 }
 
-temp <- lapply(costTableList, '[', 2) %>% dplyr::bind_cols()
+temp <- lapply(reliabilityList, '[', 2) %>% dplyr::bind_cols()
 
 data <- data.frame(t = t,
                    meanVal = apply(temp, 1, mean),
@@ -200,23 +180,50 @@ ggplot(data = data, aes(t)) +
 ```
 
 
+# Evaluate goodness of fit
 
-## Evaluate goodness of fit
-
-```{R}
+```{R, class.source='fold-show'}
 params <- data.frame(rstan::extract(lcd_exponential_output)["lambda"])
 colnames(params) <- "rate"
 
-t <- bayesian_chi_squared_test(y = lcd_projector_failures$projection_hours,
+bayesian_chi_squared_test(y = lcd_projector_failures$projection_hours,
                                distribution_fun = pexp,
                                params = params,
                                data_type = "continuous")
 
 ```
 
-### Weibull fit:
+# Weibull fit:
+We try fitting a Weibull model to the same data. Weibull distributions have two parameter; shape and scale. In this case, good priors for shape and scale are; gamma(1, 1) and gamma(2.5, 0.006) respectively. Using the STAN model given above for the exponential model as a guide, and the skeleton below, see if you can construct the model yourself.
+    
+```{R, eval = FALSE, class.source = 'fold-show'}
 
-## Build model
+modelString <- "
+  data {
+    int<lower=0> Nobs;
+    vector<lower=0>[Nobs] projection_hours;
+  }
+
+  parameters {
+    ...
+  }
+
+  model {
+    ...
+  }
+"
+
+lcd_weibull_model <- rstan::stan_model(model_code = modelString)
+
+lcd_fail_list <- list(Nobs = NROW(lcd_projector_failures$projection_hours),
+                          projection_hours = lcd_projector_failures$projection_hours
+                          )
+
+lcd_weibull_output <- rstan::sampling(lcd_weibull_model, data = lcd_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+```
+
+
 ```{R}
 
 modelString <- "
@@ -249,43 +256,26 @@ lcd_weibull_output <- rstan::sampling(lcd_weibull_model, data = lcd_fail_list, c
 
 ```
 
-## Evaluate goodness of fit
-```{R}
+# Evaluate goodness of fit
+```{R, class.source='fold-show'}
 
-n <- NROW(lcd_projector_failures)
-K <- round(n^0.4)
-a <- seq(0,1,1/K)
-p <- diff(a)
-m <- numeric(K)
-output_vals <- rstan::extract(lcd_weibull_output)
+params <- data.frame(rstan::extract(lcd_weibull_output)["shape"],
+                     rstan::extract(lcd_weibull_output)["scale"])
+colnames(params) <- c("shape", "scale")
 
-chi_val <- qchisq(0.95,K-1)
-r_b <- numeric(NROW(output_vals$shape))
-
-for (jj in 1:NROW(r_b)) {
-  
-  thisShape <- output_vals$shape[jj]
-  thisScale <- output_vals$scale[jj]
-  
-  probabilities <- pweibull(lcd_projector_failures$projection_hours, thisShape, thisScale)
-  
-  for (ii in 1:length(m)){
-    m[ii] <- sum(probabilities > a[ii] & probabilities < a[ii+1])
-  }
-  
-  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
-
-}
-
-(sum(r_b > chi_val)/NROW(r_b) * 100)
-
+bayesian_chi_squared_test(y = lcd_projector_failures$projection_hours,
+                               distribution_fun = pweibull,
+                               params = params,
+                               data_type = "continuous")
 ```
 
 
-### lognormal fit:
+# lognormal fit:
 
-## Build model
-```{R}
+We the try fitting a lognormal model to the same data.
+
+# Build model
+```{R, class.source='fold-show'}
 
 modelString <- "
   data {
@@ -324,34 +314,45 @@ lcd_lognormal_output <- rstan::sampling(lcd_lognormal_model, data = lcd_fail_lis
 ```
 
 
-## Evaluate goodness of fit
-```{R}
+# Evaluate goodness of fit
+```{R, class.source='fold-show'}
 
-n <- NROW(lcd_projector_failures)
-K <- round(n^0.4)
-a <- seq(0,1,1/K)
-p <- diff(a)
-m <- numeric(K)
-output_vals <- rstan::extract(lcd_lognormal_output)
+params <- data.frame(rstan::extract(lcd_lognormal_output)["mu"],
+                     rstan::extract(lcd_lognormal_output)["sigma"])
+colnames(params) <- c("meanlog", "sdlog")
 
-chi_val <- qchisq(0.95,K-1)
-r_b <- numeric(NROW(output_vals$mu))
+bayesian_chi_squared_test(y = lcd_projector_failures$projection_hours,
+                               distribution_fun = plnorm,
+                               params = params,
+                               data_type = "continuous")
+```
 
-for (jj in 1:NROW(r_b)) {
-  
-  thisMu <- output_vals$mu[jj]
-  thisSigma <- output_vals$sigma[jj]
-  
-  probabilities <- plnorm(lcd_projector_failures$projection_hours, thisMu, thisSigma)
-  
-  for (ii in 1:length(m)){
-    m[ii] <- sum(probabilities > a[ii] & probabilities < a[ii+1])
-  }
-  
-  r_b[jj] <- sum(((m - n*p)^2)/(n*p))
 
-}
 
-(sum(r_b > chi_val)/NROW(r_b) * 100)
+# Comparison between exponential, weibull, and lognormal fits
+According to the Chi-squared results, all three models appear to fit the data well, but how should we decide which model to use? We can use the Bayesian Information Criterion for model comparison. The BIC considers how well the model fits the data but also penalises complicated models with many parameters.
+
+```{R, class.source='fold-show'}
+
+data <- lcd_projector_failures$projection_hours
+
+expo <- rstan::extract(lcd_exponential_output)
+lambda <- mean(expo$lambda)
+exponential_BIC <- -2*log(prod(dexp(data, lambda))) + log(NROW(data))*1
+(paste("Exponential model BIC = ", exponential_BIC))
+
+weib <- rstan::extract(lcd_weibull_output)
+shape <- mean(weib$shape)
+scale <- mean(weib$scale)
+weibull_BIC <- -2*log(prod(dweibull(data, shape, scale))) + log(NROW(data))*2
+(paste("Weibull model BIC = ", weibull_BIC))
+
+logn <- rstan::extract(lcd_lognormal_output)
+mu <- mean(logn$mu)
+sigma <- mean(logn$sigma)
+lnorm_BIC <- -2*log(prod(dlnorm(data, mu, sigma))) + log(NROW(data))*2
+(paste("Lognormal model BIC = ", lnorm_BIC))
 
 ```
+
+Here we see that the exponential distribution has the lowest BIC value. The exponential distribution is a special case of the Weibull distribution so the fact that it has only one parameter means it would be a simpler model in this case. The lognormal and Weibull distributions both have two parameters - comparing their respective BIC values we see that the Weibull model has a lower BIC suggesting it is a better model for the data than the lognormal model in this case.
