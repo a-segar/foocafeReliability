@@ -222,7 +222,6 @@ server <- shiny::shinyServer(function(input, output, session) {
     showModal(modalDialog("Sampling from posterior", footer = NULL))
 
 
-
     failures <- strex::str_extract_numbers(input$failures_data)[[1]]
     suspensions <- strex::str_extract_numbers(input$suspensions_data)[[1]]
 
@@ -350,8 +349,11 @@ server <- shiny::shinyServer(function(input, output, session) {
   })
 
   output$ppc_plot <- shiny::renderPlot({
+
+    failures <- strex::str_extract_numbers(input$failures_data)[[1]]
+
     model_output <- stanModel()
-    x <- list(y = lcd_projector_failures$projection_hours,
+    x <- list(y = failures,
               yrep = rstan::extract(model_output, "y_rep")$y_rep)
     bayesplot::ppc_dens_overlay(x[["y"]], x[["yrep"]][1:100,, drop = FALSE])
 
