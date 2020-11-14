@@ -43,12 +43,12 @@ int<lower=0> Nobs;
 int<lower=0> Ncen;
 vector<lower=0>[Nobs] yobs;
 vector<lower=0>[Ncen] ycen;
+real<lower=0> rate;
 }
 
 parameters {
 real<lower=0> shape;
 real<lower=0> scale;
-
 }
 
 model {
@@ -56,7 +56,7 @@ target += weibull_lpdf(yobs | shape, scale);
 target += weibull_lccdf(ycen | shape, scale);
 
 shape ~ gamma(1, 1);
-scale ~ gamma(3, 0.001);
+scale ~ gamma(3, rate);
 }
 
 generated quantities {
@@ -118,21 +118,22 @@ library(ggplot2)
 
 
 ui <- shiny::shinyUI(fluidPage(
-  shiny::titlePanel("LCD projector failure analysis"),
+  shiny::titlePanel("Bayesian survival analysis"),
 
   shiny::mainPanel("",
                    shiny::tabsetPanel(type = "tabs",
                                       shiny::tabPanel("Input data",
-                                                      shiny::textAreaInput("failures_data", "Failures", '1000 2000 3000', width = "500px", height = "100px"),
-                                                      shiny::textAreaInput("suspensions_data", "Suspensions", '3000 3000 3000', width = "500px", height = "100px")),
+                                                      shiny::numericInput("reflife", "Reference lifetime", "3000"),
+                                                      shiny::textAreaInput("failures_data", "Failures", '2000 1000 2000 3000', width = "500px", height = "100px"),
+                                                      shiny::textAreaInput("suspensions_data", "Suspensions", '3000 3000 3000 3500 2500 2000 2500 2600', width = "500px", height = "100px")),
                                       shiny::tabPanel("View input data",
                                                                       shiny::plotOutput("input_data_disp")),
                                                       shiny::tabPanel("Select model",
                                                                       shiny::tabsetPanel(type = "tabs",
                                                                                          shiny::tabPanel("Model structure",
                                                                                                          shinyWidgets::pickerInput("model", "",
-                                                                                                                                   choices = c("Exponential", "Lognormal", "Weibull", "Custom"),
-                                                                                                                                   selected = c("Exponential"),
+                                                                                                                                   choices = c("Weibull", "Exponential", "Lognormal", "Custom"),
+                                                                                                                                   selected = c("Weibull"),
                                                                                                                                    options = list(`actions-box` = TRUE), multiple = FALSE),
                                                                                                          shiny::verbatimTextOutput("model_text")
                                                                                          ),
@@ -224,11 +225,13 @@ server <- shiny::shinyServer(function(input, output, session) {
 
     failures <- strex::str_extract_numbers(input$failures_data)[[1]]
     suspensions <- strex::str_extract_numbers(input$suspensions_data)[[1]]
+    rate <- 3/input$reflife
 
     fail_susp_list <- list(Nobs = NROW(failures),
                            yobs = failures,
                            Ncen = NROW(suspensions),
-                           ycen = suspensions)
+                           ycen = suspensions,
+                           rate = rate)
 
     sampling_output <- rstan::sampling(stan_models[[tolower(input$model)]], data = fail_susp_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
