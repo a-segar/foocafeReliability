@@ -1,101 +1,104 @@
 
 modelStr <- list()
 modelStr[["exponential"]] <- "
-  data {
-    int<lower=0> Nobs;
-    real<lower=0> projection_hours[Nobs];
-  }
+data {
+int<lower=0> Nobs;
+real<lower=0> projection_hours[Nobs];
+}
 
-  parameters {
-    real<lower=0> lambda;
+parameters {
+real<lower=0> lambda;
 
-    real<lower=0> lambda_prior;
-  }
+real<lower=0> lambda_prior;
+}
 
-  transformed parameters {
-    real MTTF;
+transformed parameters {
+real MTTF;
 
-    MTTF = 1 / lambda;
-  }
+MTTF = 1 / lambda;
+}
 
-  model {
-    projection_hours ~ exponential(lambda);
+model {
+projection_hours ~ exponential(lambda);
 
-    lambda ~ gamma(2.5, 2350);
+lambda ~ gamma(2.5, 2350);
 
-    lambda_prior ~ gamma(2.5, 2350);
-  }
+lambda_prior ~ gamma(2.5, 2350);
+}
 
-  generated quantities {
-    //sample predicted values from the model for posterior predictive checks
-    real y_rep[Nobs];
+generated quantities {
+//sample predicted values from the model for posterior predictive checks
+real y_rep[Nobs];
 
-    for(n in 1:Nobs)
-      y_rep[n] = exponential_rng(lambda);
-  }
+for(n in 1:Nobs)
+y_rep[n] = exponential_rng(lambda);
+}
 "
 
 modelStr[["weibull"]] <- "
-  data {
-    int<lower=0> Nobs;
-    vector<lower=0>[Nobs] projection_hours;
-  }
+data {
+int<lower=0> Nobs;
+int<lower=0> Ncen;
+vector<lower=0>[Nobs] yobs
+vector<lower=0>[Ncen] ycen;
+}
 
-  parameters {
-    real<lower=0> shape;
-    real<lower=0> scale;
+parameters {
+real<lower=0> shape;
+real<lower=0> scale;
 
-  }
+}
 
-  model {
-    target += weibull_lpdf(projection_hours | shape, scale);
+model {
+target += weibull_lpdf(yobs | shape, scale);
+target += weibull_lccdf(ycen | shape, scale);
 
-    shape ~ gamma(1, 1);
-    scale ~ gamma(2.5, 0.006);
-  }
+shape ~ gamma(1, 1);
+scale ~ gamma(3, 0.001);
+}
 
-  generated quantities {
-    //sample predicted values from the model for posterior predictive checks
-    real y_rep[Nobs];
+generated quantities {
+//sample predicted values from the model for posterior predictive checks
+real y_rep[Nobs];
 
-    for(n in 1:Nobs)
-      y_rep[n] = weibull_rng(shape, scale);
-  }
-  "
+for(n in 1:Nobs)
+y_rep[n] = weibull_rng(shape, scale);
+}
+"
 
 modelStr[["lognormal"]] <- "
-  data {
-    int<lower=0> Nobs;
-    vector<lower=0>[Nobs] projection_hours;
-  }
+data {
+int<lower=0> Nobs;
+vector<lower=0>[Nobs] projection_hours;
+}
 
-  parameters {
-    real mu;
-    real sigma_2;
-  }
+parameters {
+real mu;
+real sigma_2;
+}
 
-  transformed parameters {
-    real<lower=0> sigma;
+transformed parameters {
+real<lower=0> sigma;
 
-    sigma = sqrt(sigma_2);
-  }
+sigma = sqrt(sigma_2);
+}
 
-  model {
+model {
 
-    target += lognormal_lpdf(projection_hours | mu, sigma);
+target += lognormal_lpdf(projection_hours | mu, sigma);
 
-    mu ~ normal(6, 5);
-    sigma_2 ~ inv_gamma(6.5, 23.5);
-  }
+mu ~ normal(6, 5);
+sigma_2 ~ inv_gamma(6.5, 23.5);
+}
 
-  generated quantities {
-    //sample predicted values from the model for posterior predictive checks
-    real y_rep[Nobs];
+generated quantities {
+//sample predicted values from the model for posterior predictive checks
+real y_rep[Nobs];
 
-    for(n in 1:Nobs)
-      y_rep[n] = lognormal_rng(mu, sigma);
-  }
-  "
+for(n in 1:Nobs)
+y_rep[n] = lognormal_rng(mu, sigma);
+}
+"
 
 # stan_models <- list()
 # stan_models[["exponential"]] <- rstan::stan_model(model_code = modelStr[["exponential"]])
@@ -114,65 +117,79 @@ ui <- shiny::shinyUI(fluidPage(
 
   shiny::mainPanel("",
                    shiny::tabsetPanel(type = "tabs",
-                                      shiny::tabPanel("View data",
-                                                      shiny::plotOutput("raw_data_histogram")),
-                                      shiny::tabPanel("Select model",
-                                                      shiny::tabsetPanel(type = "tabs",
-                                                                         shiny::tabPanel("Model structure",
-                                                                                         shinyWidgets::pickerInput("model", "",
-                                                                                                                   choices = c("Exponential", "Lognormal", "Weibull", "Custom"),
-                                                                                                                   selected = c("Exponential"),
-                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
-                                                                                         shiny::verbatimTextOutput("model_text")
-                                                                         ),
-                                                                         shiny::tabPanel("Custom model",
-                                                                                         textAreaInput("caption", "Caption", modelStr[["exponential"]], width = "1000px", height = "600px")
-                                                                         )
-                                                      )
-                                      ),
-                                      shiny::tabPanel("Sample from posterior distribution",
-                                                      shiny::actionButton("sample_from_posterior", "Sample from posterior"),
-                                                      shiny::plotOutput("stanPlot"),
-                                                      shiny::plotOutput("prior_comparison")
-                                      ),
-                                      shiny::tabPanel("Check model fit",
-                                                      shiny::textOutput("chi_squared_val"),
-                                                      shiny::textOutput("BIC_val"),
-                                                      shiny::tabsetPanel(type = "tabs",
-                                                                         shiny::tabPanel("Graphical posterior predictive check",
-                                                                                         shiny::plotOutput("ppc_plot")),
-                                                                         shiny::tabPanel("PPP test statistic",
-                                                                                         shinyWidgets::pickerInput("ppp_test_statistic", "",
-                                                                                                                   choices = c("mean", "max", "min", "custom"),
-                                                                                                                   selected = c("mean"),
-                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
-                                                                                         shiny::textInput("custom_ppp_test_statistic", "Custom PPP test statistic"),
-                                                                                         shiny::textOutput("ppp_val"),
-                                                                                         shiny::plotOutput("ppp_plot"))
+                                      shiny::tabPanel("Input data",
+                                                      shiny::textAreaInput("failures_data", "Failures", '1 2 3', width = "500px", height = "100px"),
+                                                      shiny::textAreaInput("suspensions_data", "Suspensions", '1 2 3', width = "500px", height = "100px")),
+                                      shiny::tabPanel("View input data",
+                                                                      shiny::plotOutput("input_data_disp")),
+                                                      shiny::tabPanel("Select model",
+                                                                      shiny::tabsetPanel(type = "tabs",
+                                                                                         shiny::tabPanel("Model structure",
+                                                                                                         shinyWidgets::pickerInput("model", "",
+                                                                                                                                   choices = c("Exponential", "Lognormal", "Weibull", "Custom"),
+                                                                                                                                   selected = c("Exponential"),
+                                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
+                                                                                                         shiny::verbatimTextOutput("model_text")
+                                                                                         ),
+                                                                                         shiny::tabPanel("Custom model",
+                                                                                                         textAreaInput("caption", "Caption", modelStr[["exponential"]], width = "1000px", height = "600px")
+                                                                                         )
+                                                                      )
+                                                      ),
+                                                      shiny::tabPanel("Sample from posterior distribution",
+                                                                      shiny::actionButton("sample_from_posterior", "Sample from posterior"),
+                                                                      shiny::plotOutput("stanPlot"),
+                                                                      shiny::plotOutput("prior_comparison")
+                                                      ),
+                                                      shiny::tabPanel("Check model fit",
+                                                                      shiny::textOutput("chi_squared_val"),
+                                                                      shiny::textOutput("BIC_val"),
+                                                                      shiny::tabsetPanel(type = "tabs",
+                                                                                         shiny::tabPanel("Graphical posterior predictive check",
+                                                                                                         shiny::plotOutput("ppc_plot")),
+                                                                                         shiny::tabPanel("PPP test statistic",
+                                                                                                         shinyWidgets::pickerInput("ppp_test_statistic", "",
+                                                                                                                                   choices = c("mean", "max", "min", "custom"),
+                                                                                                                                   selected = c("mean"),
+                                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
+                                                                                                         shiny::textInput("custom_ppp_test_statistic", "Custom PPP test statistic"),
+                                                                                                         shiny::textOutput("ppp_val"),
+                                                                                                         shiny::plotOutput("ppp_plot"))
+                                                                      )
                                                       )
                                       )
                    )
   )
-)
 )
 
 
 
 server <- shiny::shinyServer(function(input, output, session) {
 
-
   ####################
   ## Plot raw data: ##
   ####################
 
-  output$raw_data_histogram <- shiny::renderPlot({
+  output$input_data_disp <- shiny::renderPlot({
 
-    lcd_projector_failures %>%
-      ggplot(aes(x = projection_hours)) +
-      geom_histogram(fill = "turquoise", binwidth = 100) +
-      labs(x = "Failure time", y = "Count")
+    failures <- strex::str_extract_numbers(input$failures_data)[[1]]
+    suspensions <- strex::str_extract_numbers(input$suspensions_data)[[1]]
+
+    data <- tibble::tibble(time_since_event = c(failures, suspensions),
+                           failure_suspension = c(rep("F", length(failures)), rep("S", length(suspensions)))
+                           )
+
+    data <- as.data.frame(data)
+
+    data %>%
+      ggplot(aes(x = time_since_event, fill=failure_suspension)) +
+      geom_histogram(binwidth = 10) +
+      facet_grid(failure_suspension~.) +
+      labs(x = "Failure time", y = "Count") +
+      scale_fill_manual(labels=c("F", "S"), values=c("green","brown"))
 
   })
+
 
   #################
   ## STAN model: ##
