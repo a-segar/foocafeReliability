@@ -3,9 +3,10 @@ modelStr <- list()
 modelStr[["exponential"]] <- "
 data {
 int<lower=0> Nobs;
-real<lower=0> projection_hours[Nobs];
+int<lower=0> Ncen;
+vector<lower=0>[Nobs] yobs;
+vector<lower=0>[Ncen] ycen;
 }
-
 parameters {
 real<lower=0> lambda;
 
@@ -19,7 +20,8 @@ MTTF = 1 / lambda;
 }
 
 model {
-projection_hours ~ exponential(lambda);
+target += exponential_lpdf(yobs | lambda);
+target += exponential_lccdf(ycen | lambda);
 
 lambda ~ gamma(2.5, 2350);
 
@@ -39,7 +41,7 @@ modelStr[["weibull"]] <- "
 data {
 int<lower=0> Nobs;
 int<lower=0> Ncen;
-vector<lower=0>[Nobs] yobs
+vector<lower=0>[Nobs] yobs;
 vector<lower=0>[Ncen] ycen;
 }
 
@@ -69,7 +71,9 @@ y_rep[n] = weibull_rng(shape, scale);
 modelStr[["lognormal"]] <- "
 data {
 int<lower=0> Nobs;
-vector<lower=0>[Nobs] projection_hours;
+int<lower=0> Ncen;
+vector<lower=0>[Nobs] yobs;
+vector<lower=0>[Ncen] ycen;
 }
 
 parameters {
@@ -85,7 +89,8 @@ sigma = sqrt(sigma_2);
 
 model {
 
-target += lognormal_lpdf(projection_hours | mu, sigma);
+target += lognormal_lpdf(yobs | mu, sigma);
+target += lognormal_lccdf(ycen | mu, sigma);
 
 mu ~ normal(6, 5);
 sigma_2 ~ inv_gamma(6.5, 23.5);
@@ -100,11 +105,11 @@ y_rep[n] = lognormal_rng(mu, sigma);
 }
 "
 
-# stan_models <- list()
-# stan_models[["exponential"]] <- rstan::stan_model(model_code = modelStr[["exponential"]])
-# stan_models[["weibull"]] <- rstan::stan_model(model_code = modelStr[["weibull"]])
-# stan_models[["lognormal"]] <- rstan::stan_model(model_code = modelStr[["lognormal"]])
-
+#stan_models <- list()
+#stan_models[["exponential"]] <- rstan::stan_model(model_code = modelStr[["exponential"]])
+#stan_models[["weibull"]] <- rstan::stan_model(model_code = modelStr[["weibull"]])
+#stan_models[["lognormal"]] <- rstan::stan_model(model_code = modelStr[["lognormal"]])
+#saveRDS(stan_models, "stan_models.RDS")
 
 library(shiny)
 library(rstan)
@@ -118,8 +123,8 @@ ui <- shiny::shinyUI(fluidPage(
   shiny::mainPanel("",
                    shiny::tabsetPanel(type = "tabs",
                                       shiny::tabPanel("Input data",
-                                                      shiny::textAreaInput("failures_data", "Failures", '1 2 3', width = "500px", height = "100px"),
-                                                      shiny::textAreaInput("suspensions_data", "Suspensions", '1 2 3', width = "500px", height = "100px")),
+                                                      shiny::textAreaInput("failures_data", "Failures", '1000 2000 3000', width = "500px", height = "100px"),
+                                                      shiny::textAreaInput("suspensions_data", "Suspensions", '3000 3000 3000', width = "500px", height = "100px")),
                                       shiny::tabPanel("View input data",
                                                                       shiny::plotOutput("input_data_disp")),
                                                       shiny::tabPanel("Select model",
@@ -216,15 +221,22 @@ server <- shiny::shinyServer(function(input, output, session) {
 
     showModal(modalDialog("Sampling from posterior", footer = NULL))
 
-    lcd_fail_list <- list(Nobs = NROW(lcd_projector_failures$projection_hours),
-                          projection_hours = lcd_projector_failures$projection_hours
-    )
-    lcd_output <- rstan::sampling(stan_models[[tolower(input$model)]], data = lcd_fail_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+
+
+    failures <- strex::str_extract_numbers(input$failures_data)[[1]]
+    suspensions <- strex::str_extract_numbers(input$suspensions_data)[[1]]
+
+    fail_susp_list <- list(Nobs = NROW(failures),
+                           yobs = failures,
+                           Ncen = NROW(suspensions),
+                           ycen = suspensions)
+
+    sampling_output <- rstan::sampling(stan_models[[tolower(input$model)]], data = fail_susp_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
 
     removeModal()
 
 
-    return(lcd_output)
+    return(sampling_output)
 
   })
 
