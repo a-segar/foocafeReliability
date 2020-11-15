@@ -115,6 +115,7 @@ library(shiny)
 library(rstan)
 library(Rcpp)
 library(ggplot2)
+library(magrittr)
 
 
 ui <- shiny::shinyUI(fluidPage(
@@ -123,7 +124,7 @@ ui <- shiny::shinyUI(fluidPage(
   shiny::mainPanel("",
                    shiny::tabsetPanel(type = "tabs",
                                       shiny::tabPanel("Input data",
-                                                      shiny::numericInput("reflife", "Reference lifetime", "3000"),
+                                                      shiny::numericInput("rate", "Gamma prior rate", "0.006"),
                                                       shiny::textAreaInput("failures_data", "Failures", '2000 1000 2000 3000', width = "500px", height = "100px"),
                                                       shiny::textAreaInput("suspensions_data", "Suspensions", '3000 3000 3000 3500 2500 2000 2500 2600', width = "500px", height = "100px")),
                                       shiny::tabPanel("View input data",
@@ -225,7 +226,7 @@ server <- shiny::shinyServer(function(input, output, session) {
 
     failures <- strex::str_extract_numbers(input$failures_data)[[1]]
     suspensions <- strex::str_extract_numbers(input$suspensions_data)[[1]]
-    rate <- 3/input$reflife
+    rate <- input$rate
 
     fail_susp_list <- list(Nobs = NROW(failures),
                            yobs = failures,
@@ -233,7 +234,7 @@ server <- shiny::shinyServer(function(input, output, session) {
                            ycen = suspensions,
                            rate = rate)
 
-    sampling_output <- rstan::sampling(stan_models[[tolower(input$model)]], data = fail_susp_list, chains = 4, iter = 4000, control = list(adapt_delta = 0.9))
+    sampling_output <- rstan::sampling(stan_models[[tolower(input$model)]], data = fail_susp_list, chains = 10, iter = 4000, control = list(adapt_delta = 0.9))
 
     removeModal()
 
