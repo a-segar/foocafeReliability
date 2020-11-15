@@ -148,6 +148,9 @@ ui <- shiny::shinyUI(fluidPage(
                                                       shiny::plotOutput("stanPlot"),
                                                       shiny::plotOutput("prior_comparison")
                                                       ),
+                                      shiny::tabPanel("View posterior distibution",
+                                                      shiny::plotOutput("posterior")
+                                      ),
                                       shiny::tabPanel("Check model fit",
                                                       shiny::textOutput("chi_squared_val"),
                                                       shiny::textOutput("BIC_val"),
@@ -271,6 +274,19 @@ server <- shiny::shinyServer(function(input, output, session) {
         geom_density(aes(lambda)) +
         geom_density(aes(lambda_prior), linetype = "dashed")
     }
+
+  })
+
+  output$posterior <- shiny::renderPlot({
+
+    model_output <- stanModel()
+
+    params_to_plot <- names(model_output)[substr(names(model_output),1,5) != "y_rep" &
+                                            substr(names(model_output),1,5) != "lp__" &
+                                            substr(names(model_output),
+                                                   nchar(names(model_output))-4,
+                                                   nchar(names(model_output))) != "prior"]
+    stan_hist(model_output, params_to_plot)
 
   })
 
