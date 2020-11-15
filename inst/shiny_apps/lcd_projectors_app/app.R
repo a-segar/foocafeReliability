@@ -128,40 +128,40 @@ ui <- shiny::shinyUI(fluidPage(
                                                       shiny::textAreaInput("failures_data", "Failures", '2000 1000 2000 3000', width = "500px", height = "100px"),
                                                       shiny::textAreaInput("suspensions_data", "Suspensions", '3000 3000 3000 3500 2500 2000 2500 2600', width = "500px", height = "100px")),
                                       shiny::tabPanel("View input data",
-                                                                      shiny::plotOutput("input_data_disp")),
-                                                      shiny::tabPanel("Select model",
-                                                                      shiny::tabsetPanel(type = "tabs",
-                                                                                         shiny::tabPanel("Model structure",
-                                                                                                         shinyWidgets::pickerInput("model", "",
-                                                                                                                                   choices = c("Weibull", "Exponential", "Lognormal", "Custom"),
-                                                                                                                                   selected = c("Weibull"),
-                                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
-                                                                                                         shiny::verbatimTextOutput("model_text")
+                                                      shiny::plotOutput("input_data_disp")),
+                                      shiny::tabPanel("Select model",
+                                                      shiny::tabsetPanel(type = "tabs",
+                                                                         shiny::tabPanel("Model structure",
+                                                                                         shinyWidgets::pickerInput("model", "",
+                                                                                                                   choices = c("Weibull", "Exponential", "Lognormal", "Custom"),
+                                                                                                                   selected = c("Weibull"),
+                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
+                                                                                         shiny::verbatimTextOutput("model_text")
                                                                                          ),
-                                                                                         shiny::tabPanel("Custom model",
-                                                                                                         textAreaInput("caption", "Caption", modelStr[["exponential"]], width = "1000px", height = "600px")
+                                                                         shiny::tabPanel("Custom model",
+                                                                                         textAreaInput("caption", "Caption", modelStr[["exponential"]], width = "1000px", height = "600px")
                                                                                          )
                                                                       )
                                                       ),
-                                                      shiny::tabPanel("Sample from posterior distribution",
-                                                                      shiny::actionButton("sample_from_posterior", "Sample from posterior"),
-                                                                      shiny::plotOutput("stanPlot"),
-                                                                      shiny::plotOutput("prior_comparison")
+                                      shiny::tabPanel("Sample from posterior distribution",
+                                                      shiny::actionButton("sample_from_posterior", "Sample from posterior"),
+                                                      shiny::plotOutput("stanPlot"),
+                                                      shiny::plotOutput("prior_comparison")
                                                       ),
-                                                      shiny::tabPanel("Check model fit",
-                                                                      shiny::textOutput("chi_squared_val"),
-                                                                      shiny::textOutput("BIC_val"),
-                                                                      shiny::tabsetPanel(type = "tabs",
-                                                                                         shiny::tabPanel("Graphical posterior predictive check",
-                                                                                                         shiny::plotOutput("ppc_plot")),
-                                                                                         shiny::tabPanel("PPP test statistic",
-                                                                                                         shinyWidgets::pickerInput("ppp_test_statistic", "",
-                                                                                                                                   choices = c("mean", "max", "min", "custom"),
-                                                                                                                                   selected = c("mean"),
-                                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
-                                                                                                         shiny::textInput("custom_ppp_test_statistic", "Custom PPP test statistic"),
-                                                                                                         shiny::textOutput("ppp_val"),
-                                                                                                         shiny::plotOutput("ppp_plot"))
+                                      shiny::tabPanel("Check model fit",
+                                                      shiny::textOutput("chi_squared_val"),
+                                                      shiny::textOutput("BIC_val"),
+                                                      shiny::tabsetPanel(type = "tabs",
+                                                                         shiny::tabPanel("Graphical posterior predictive check",
+                                                                                         shiny::plotOutput("ppc_plot")),
+                                                                         shiny::tabPanel("PPP test statistic",
+                                                                                         shinyWidgets::pickerInput("ppp_test_statistic", "",
+                                                                                                                   choices = c("mean", "max", "min", "custom"),
+                                                                                                                   selected = c("mean"),
+                                                                                                                   options = list(`actions-box` = TRUE), multiple = FALSE),
+                                                                                         shiny::textInput("custom_ppp_test_statistic", "Custom PPP test statistic"),
+                                                                                         shiny::textOutput("ppp_val"),
+                                                                                         shiny::plotOutput("ppp_plot"))
                                                                       )
                                                       )
                                       )
