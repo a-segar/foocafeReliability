@@ -110,67 +110,18 @@ y_rep[n] = lognormal_rng(mu, sigma);
 #stan_models[["weibull"]] <- rstan::stan_model(model_code = modelStr[["weibull"]])
 #stan_models[["lognormal"]] <- rstan::stan_model(model_code = modelStr[["lognormal"]])
 #saveRDS(stan_models, "stan_models.RDS")
+#
+# failures = strex::str_extract_numbers('102 246 125 247 169 305 138 262 179 182 221 267 227 174 247  94 101 197 203 108 122 136 199 290 305 155 110 171 230 151 213 264 185 109  91  95 254 175')[[1]]
+# suspensions = strex::str_extract_numbers('138 228 187 207 105   5  22  33 109   2  17 270  27  36 194  17 100  34 180 101  36  22 105  47')[[1]]
+# # rate <- 0.006
+# fail_susp_list <- list(Nobs = NROW(failures),
+#                        yobs = failures,
+#                        Ncen = NROW(suspensions),
+#                        ycen = suspensions,
+#                        rate = rate)
+# sampling_output <- rstan::sampling(stan_models[[tolower("weibull")]], data = fail_susp_list, chains = 10, iter = 4000, control = list(adapt_delta = 0.9))
+# output_vals <- rstan::extract(sampling_output)
 
-failures = strex::str_extract_numbers('102 246 125 247 169 305 138 262 179 182 221 267 227 174 247  94 101 197 203 108 122 136 199 290 305 155 110 171 230 151 213 264 185 109  91  95 254 175')[[1]]
-suspensions = strex::str_extract_numbers('138 228 187 207 105   5  22  33 109   2  17 270  27  36 194  17 100  34 180 101  36  22 105  47')[[1]]
-rate <- 0.006
-fail_susp_list <- list(Nobs = NROW(failures),
-                       yobs = failures,
-                       Ncen = NROW(suspensions),
-                       ycen = suspensions,
-                       rate = rate)
-sampling_output <- rstan::sampling(stan_models[[tolower("weibull")]], data = fail_susp_list, chains = 10, iter = 4000, control = list(adapt_delta = 0.9))
-output_vals <- rstan::extract(sampling_output)
-
-
-tableList <- list()
-
-for (ii in 1:NROW(output_vals$shape)){
-
-  thisShape <- as.numeric(output_vals$shape[ii])
-  thisScale <- as.numeric(output_vals$scale[ii])
-
-  get_reliability <- function(shape, scale){
-    f1 <- function(t){
-      exp(1)^(-(t/scale)^shape)
-    }
-    return(f1)
-  }
-
-
-  t <- c(seq(0.1, 2.4, 0.1) * 200)
-  thisTable <- data.frame("t" = t,
-                          "reliability" = numeric(NROW(t)),
-                          "mean_life" = numeric(NROW(t)),
-                          "preventive_cost" = numeric(NROW(t)),
-                          "corrective_cost" = numeric(NROW(t)),
-                          "total_cost" = numeric(NROW(t)))
-
-  reliability <- get_reliability(thisShape, thisScale)
-  thisTable$reliability <- reliability(t)
-
-  tableList[[ii]] <- thisTable
-
-}
-
-finalTable <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), mean) %>% as.data.frame()
-finalTableLQ <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), function(x){quantile(x, 0.01)}) %>% as.data.frame()
-finalTableHQ <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), function(x){quantile(x, 0.99)}) %>% as.data.frame()
-
-output <- data.frame(t = finalTable$t,
-
-                     lower_bound = finalTableLQ$reliability,
-                     mean_val = finalTable$reliability,
-                     upper_bound = finalTableHQ$reliability
-
-)
-
-
-ggplot(data = output, aes(t)) +
-  geom_line(aes(y = mean_val)) +
-  geom_ribbon(aes(ymin=lower_bound, ymax=upper_bound), alpha=0.05) +
-  xlab("Running hours") +
-  ylab("Reliability")
 
 
 library(shiny)
@@ -341,21 +292,60 @@ server <- shiny::shinyServer(function(input, output, session) {
 
   output$posterior <- shiny::renderPlot({
 
+    showModal(modalDialog("Generating plot", footer = NULL))
 
     model_output <- stanModel()
     output_vals <- rstan::extract(model_output)
 
-    thisBeta <- as.numeric(output_vals$beta)
-    thisEta <- as.numeric(output_vals$eta)
+    tableList <- list()
 
-    get_reliability <- function(beta, eta){
-      f1 <- function(t){
-        exp(1)^(-(t/eta)^beta)
+    for (ii in 1:NROW(output_vals$shape)){
+
+      thisShape <- as.numeric(output_vals$shape[ii])
+      thisScale <- as.numeric(output_vals$scale[ii])
+
+      get_reliability <- function(shape, scale){
+        f1 <- function(t){
+          exp(1)^(-(t/scale)^shape)
+        }
+        return(f1)
       }
-      return(f1)
+
+
+      t <- c(seq(0.1, 2.4, 0.1) * 200)
+      thisTable <- data.frame("t" = t,
+                              "reliability" = numeric(NROW(t)),
+                              "mean_life" = numeric(NROW(t)),
+                              "preventive_cost" = numeric(NROW(t)),
+                              "corrective_cost" = numeric(NROW(t)),
+                              "total_cost" = numeric(NROW(t)))
+
+      reliability <- get_reliability(thisShape, thisScale)
+      thisTable$reliability <- reliability(t)
+
+      tableList[[ii]] <- thisTable
+
     }
 
-    reliability <- get_reliability(thisBeta, thisEta)
+    finalTable <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), mean) %>% as.data.frame()
+    finalTableLQ <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), function(x){quantile(x, 0.01)}) %>% as.data.frame()
+    finalTableHQ <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), function(x){quantile(x, 0.99)}) %>% as.data.frame()
+
+    output <- data.frame(t = finalTable$t,
+
+                         lower_bound = finalTableLQ$reliability,
+                         mean_val = finalTable$reliability,
+                         upper_bound = finalTableHQ$reliability
+
+    )
+
+    removeModal()
+
+    ggplot(data = output, aes(t)) +
+      geom_line(aes(y = mean_val)) +
+      geom_ribbon(aes(ymin=lower_bound, ymax=upper_bound), alpha=0.05) +
+      xlab("Running hours") +
+      ylab("Reliability")
 
   })
 
