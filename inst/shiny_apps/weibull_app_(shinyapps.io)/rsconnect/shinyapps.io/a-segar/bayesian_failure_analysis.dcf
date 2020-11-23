@@ -1,0 +1,12 @@
+name: bayesian_failure_analysis
+title: bayesian_failure_analysis
+username:
+account: a-segar
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3249681
+bundleId: 3873046
+url: https://a-segar.shinyapps.io/bayesian_failure_analysis/
+when: 1605644606.11434
+asMultiple: FALSE
+asStatic: FALSE

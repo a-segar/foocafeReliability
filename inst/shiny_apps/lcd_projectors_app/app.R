@@ -1,3 +1,4 @@
+# R --slave --no-restore -e 'shiny::runApp("app.R", launch.browser=TRUE)'
 
 modelStr <- list()
 modelStr[["exponential"]] <- "
@@ -49,6 +50,8 @@ real<lower=0> rate;
 parameters {
 real<lower=0> shape;
 real<lower=0> scale;
+
+real<lower=0> shape_prior;
 }
 
 model {
@@ -57,6 +60,8 @@ target += weibull_lccdf(ycen | shape, scale);
 
 shape ~ gamma(1, 1);
 scale ~ gamma(3, rate);
+
+shape_prior ~ gamma(1,1);
 }
 
 generated quantities {
@@ -105,12 +110,12 @@ y_rep[n] = lognormal_rng(mu, sigma);
 }
 "
 
-#stan_models <- list()
-#stan_models[["exponential"]] <- rstan::stan_model(model_code = modelStr[["exponential"]])
-#stan_models[["weibull"]] <- rstan::stan_model(model_code = modelStr[["weibull"]])
-#stan_models[["lognormal"]] <- rstan::stan_model(model_code = modelStr[["lognormal"]])
-#saveRDS(stan_models, "stan_models.RDS")
-#
+# stan_models <- list()
+# stan_models[["exponential"]] <- rstan::stan_model(model_code = modelStr[["exponential"]])
+# stan_models[["weibull"]] <- rstan::stan_model(model_code = modelStr[["weibull"]])
+# stan_models[["lognormal"]] <- rstan::stan_model(model_code = modelStr[["lognormal"]])
+# saveRDS(stan_models, "stan_models.RDS")
+
 # failures = strex::str_extract_numbers('102 246 125 247 169 305 138 262 179 182 221 267 227 174 247  94 101 197 203 108 122 136 199 290 305 155 110 171 230 151 213 264 185 109  91  95 254 175')[[1]]
 # suspensions = strex::str_extract_numbers('138 228 187 207 105   5  22  33 109   2  17 270  27  36 194  17 100  34 180 101  36  22 105  47')[[1]]
 # # rate <- 0.006
@@ -130,6 +135,8 @@ library(Rcpp)
 library(ggplot2)
 library(magrittr)
 
+stan_models <- readRDS("stan_models.RDS")
+source("/workspaces/foocafeReliability/R/bayesian_chi_squared_test.R")
 
 ui <- shiny::shinyUI(fluidPage(
   shiny::titlePanel("Bayesian survival analysis"),
@@ -288,6 +295,15 @@ server <- shiny::shinyServer(function(input, output, session) {
         geom_density(aes(lambda_prior), linetype = "dashed")
     }
 
+    if(tolower(input$model) == "weibull"){
+      data <- data.frame(output_vals["shape"],
+                         output_vals["shape_prior"])
+
+      ggplot(data = data) +
+        geom_density(aes(shape)) +
+        geom_density(aes(shape_prior), linetype = "dashed")
+    }
+
   })
 
   output$posterior <- shiny::renderPlot({
@@ -378,24 +394,44 @@ server <- shiny::shinyServer(function(input, output, session) {
 
 
     } else if (tolower(input$model) == "weibull"){
+
+      showModal(modalDialog("Calculating Chi-squared value.", footer = NULL))
+
       params <- data.frame("shape" = rstan::extract(stanModel())["shape"],
                            "scale" = rstan::extract(stanModel())["scale"])
       colnames(params) <- c("shape", "scale")
+      
+      failures <- strex::str_extract_numbers(input$failures_data)[[1]]
+      suspensions <- strex::str_extract_numbers(input$suspensions_data)[[1]]
 
-      t <- bayesian_chi_squared_test(y = lcd_projector_failures$projection_hours,
-                                     distribution_fun = pweibull,
-                                     params = params,
-                                     data_type = "continuous")
+      data <- c(failures, suspensions)
+      censored <- c(rep(FALSE, length(failures)), rep(TRUE, length(suspensions)))
 
+      t <- bayesian_chi_squared_test(y = data,
+                                      distribution_fun = pweibull,
+                                      params = params,
+                                      data_type = "censored",
+                                      censored = censored)
+                                      
+      if (t < 1) {
+        goodness_of_fit <- "very well"
+        } else if (t < 5) {
+        goodness_of_fit <- "well"
+        } else if (t < 10) {
+        goodness_of_fit <- "reasonably well"
+        } else {
+        goodness_of_fit <- "not well"
+      }
 
+      removeModal()
+      return(paste(t, " percent of the R_b values exceed the 95% chi-squared quantile. This suggests the chosen model fits the data ", goodness_of_fit, "."))
+      
     } else if (tolower(input$model) == "custom"){
 
-      t <- "not available for custom models"
-
-
+      removeModal()
+      return("Bayesian Chi-squared value is not available for custom models")
+      
     }
-
-    paste("Bayesian Chi-squared value is", t)
 
   })
 
