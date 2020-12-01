@@ -584,7 +584,7 @@ server <- shiny::shinyServer(function(input, output, session) {
   output$ppp_val <- shiny::renderText({
 
     model_output <- stanModel()
-    y <- lcd_projector_failures$projection_hours
+    y <- strex::str_extract_numbers(input$failures_data)[[1]]
     output_vals <- rstan::extract(model_output)
 
     if (input$ppp_test_statistic == "custom"){
@@ -601,6 +601,10 @@ server <- shiny::shinyServer(function(input, output, session) {
 
   output$ppp_plot <- renderPlot({
 
+    model_output <- stanModel()
+    y <- strex::str_extract_numbers(input$failures_data)[[1]]
+    output_vals <- rstan::extract(model_output)
+    
     if (input$ppp_test_statistic == "custom"){
       test_stat <- input$custom_ppp_test_statistic
     } else {
