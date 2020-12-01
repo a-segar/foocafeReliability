@@ -1,3 +1,4 @@
+# cd inst/shiny_apps/lcd_projectors_app
 # R --slave --no-restore -e 'shiny::runApp("app.R", launch.browser=TRUE)'
 
 modelStr <- list()
@@ -145,6 +146,8 @@ ui <- shiny::shinyUI(fluidPage(
                    shiny::tabsetPanel(type = "tabs",
                                       shiny::tabPanel("Input data",
                                                       shiny::numericInput("rate", "Gamma prior rate", "0.006"),
+                                                      shiny::numericInput("corrective_cost", "Corrective cost per hour", "200"),
+                                                      shiny::numericInput("preventive_cost", "Preventive cost per hour", "80"),
                                                       shiny::textAreaInput("failures_data", "Failures", '102 246 125 247 169 305 138 262 179 182 221 267 227 174 247  94 101 197 203 108 122 136 199 290 305 155 110 171 230 151 213 264 185 109  91  95 254 175', width = "500px", height = "100px"),
                                                       shiny::textAreaInput("suspensions_data", "Suspensions", '138 228 187 207 105   5  22  33 109   2  17 270  27  36 194  17 100  34 180 101  36  22 105  47', width = "500px", height = "100px")),
                                       shiny::tabPanel("View input data",
@@ -170,6 +173,9 @@ ui <- shiny::shinyUI(fluidPage(
                                                       ),
                                       shiny::tabPanel("View posterior distibution",
                                                       shiny::plotOutput("posterior")
+                                      ),
+                                      shiny::tabPanel("View cost function",
+                                                      shiny::plotOutput("cost_plot")
                                       ),
                                       shiny::tabPanel("Check model fit",
                                                       shiny::textOutput("chi_squared_val"),
@@ -365,6 +371,107 @@ server <- shiny::shinyServer(function(input, output, session) {
 
   })
 
+  ##################
+  ### Cost plot ####
+  ##################
+
+  
+  output$cost_plot <- shiny::renderPlot({
+
+    showModal(modalDialog("Generating plot", footer = NULL))
+
+    model_output <- stanModel()
+    output_vals <- rstan::extract(model_output)
+
+    tableList <- list()
+
+    thisCorrectiveCost <- input$corrective_cost
+    thisPreventiveCost <- input$preventive_cost
+
+    C_lostOpportunity = 0 #To be added in later
+
+
+    for (ii in 1:NROW(output_vals$shape)){
+
+      thisShape <- as.numeric(output_vals$shape[ii])
+      thisScale <- as.numeric(output_vals$scale[ii])
+
+      get_reliability <- function(shape, scale){
+        f1 <- function(t){
+          exp(1)^(-(t/scale)^shape)
+        }
+        return(f1)
+      }
+      
+      mean_life <- function (t) {
+        output <- integrate(reliability,  lower=0, upper=t)$value
+        return(output)
+      }
+
+      t <- c(seq(0.1, 2.4, 0.1) * 200)
+      thisTable <- data.frame("t" = t,
+                              "reliability" = numeric(NROW(t)),
+                              "mean_life" = numeric(NROW(t)),
+                              "preventive_cost" = numeric(NROW(t)),
+                              "corrective_cost" = numeric(NROW(t)),
+                              "total_cost" = numeric(NROW(t)))
+
+      reliability <- get_reliability(thisShape, thisScale)
+      thisTable$reliability <- reliability(t)
+      
+      thisTable$mean_life <- purrr::map_dbl(t,
+                                            function(x){
+                                              temp <- mean_life(x)
+                                            }
+      )
+
+      thisTable$preventive_cost <- (thisTable$reliability * thisPreventiveCost) / thisTable$mean_life
+      thisTable$corrective_cost <- ((1 - thisTable$reliability) * (thisPreventiveCost + thisCorrectiveCost + C_lostOpportunity)) / thisTable$mean_life
+      thisTable$total_cost <- thisTable$preventive_cost + thisTable$corrective_cost
+
+      tableList[[ii]] <- thisTable
+
+    }
+
+
+    finalTable <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), mean) %>% as.data.frame()
+    finalTableLQ <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), function(x){quantile(x, 0.01)}) %>% as.data.frame()
+    finalTableHQ <- plyr::aaply(plyr::laply(tableList, as.matrix), c(2, 3), function(x){quantile(x, 0.99)}) %>% as.data.frame()
+
+    output <- data.frame(t = finalTable$t,
+
+                          total_lower_bound = finalTableLQ$total_cost,
+                          total_mean_cost = finalTable$total_cost,
+                          total_upper_bound = finalTableHQ$total_cost,
+                         
+                          corrective_lower_bound = finalTableLQ$corrective_cost,
+                          corrective_mean_cost = finalTable$corrective_cost,
+                          corrective_upper_bound = finalTableHQ$corrective_cost,
+
+                          preventive_lower_bound = finalTableLQ$preventive_cost,
+                          preventive_mean_cost = finalTable$preventive_cost,
+                          preventive_upper_bound = finalTableHQ$preventive_cost
+
+    )
+
+    removeModal()
+
+    ggplot(data = output, aes(t)) +
+      geom_line(aes(y = total_mean_cost, colour = "total")) +
+      geom_ribbon(aes(ymin=total_lower_bound, ymax=total_upper_bound), alpha=0.05, fill = "black") +
+      
+      geom_line(aes(y = corrective_mean_cost, colour = "corrective")) +
+      geom_ribbon(aes(ymin=corrective_lower_bound, ymax=corrective_upper_bound), alpha=0.05, fill = "red") +
+      
+      geom_line(aes(y = preventive_mean_cost, colour = "preventive")) +
+      geom_ribbon(aes(ymin=preventive_lower_bound, ymax=preventive_upper_bound), alpha=0.05, fill = "green") +
+      
+      scale_colour_manual("", values = c("total"="black", "corrective"="red", "preventive"="green")) +
+                                
+      xlab("Operating time") +
+      ylab("Cost per unit of operating time")
+
+  })
 
   ##################
   ## Review model ##
